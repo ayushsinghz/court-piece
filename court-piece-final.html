@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="Court Piece"/>
+  <meta name="theme-color" content="#ffffff"/>
+  <title>Court Piece</title>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+    body{background:white;font-family:-apple-system,system-ui,sans-serif}
+    #root{max-width:430px;margin:0 auto;min-height:100vh;
+      padding-top:env(safe-area-inset-top);
+      padding-bottom:env(safe-area-inset-bottom)}
+    input,button,textarea{font-family:inherit}
+    input::placeholder,textarea::placeholder{color:#bbb}
+    button:active{opacity:0.7}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script type="text/babel">
+const {useState,useEffect,useCallback,useRef}=React;
+const SUITS=["♠","♥","♦","♣"];
+const RED=new Set(["♥","♦"]);
+const COURT_BONUS=6;
+const GK="cp:games",AK="cp:active",LK="cp:lang";
+
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
+function load(k){try{const r=localStorage.getItem(k);return r?JSON.parse(r):null}catch{return null}}
+
+const fmt=ts=>{if(!ts)return"";const d=new Date(ts);return d.toLocaleDateString(undefined,{day:"numeric",month:"short"})+" "+d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"})};
+const newGame=()=>({id:Date.now(),name:"",teams:[{name:"Team A",players:["",""]},{name:"Team B",players:["",""]}],rounds:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),finished:false});
+const newRound=()=>({trump:null,tricks:["",""],shuffler:null});
+const calcScores=rounds=>rounds.reduce((a,r)=>{for(let i=0;i<2;i++){if(r.won[i]){a[i]+=1;if(r.court?.[i])a[i]+=COURT_BONUS}}return a},[0,0]);
+
+function scoreText(game,scores){const t=game.teams;return[`🃏 COURT PIECE${game.name?" — "+game.name:""}`,`━━━━━━━━━━━━━━━━━━━━━━`,`${t[0].name}  vs  ${t[1].name}`,`${t[0].players.join(" & ")}  vs  ${t[1].players.join(" & ")}`,`━━━━━━━━━━━━━━━━━━━━━━`,`SCORE  ${t[0].name}: ${scores[0]}  |  ${t[1].name}: ${scores[1]}`,"",`Updated: ${fmt(game.updatedAt)}`,"Scored with Court Piece app"].join("\n")}
+function fullText(game,scores){const t=game.teams,lines=[`🃏 COURT PIECE${game.name?" — "+game.name:""}`,`━━━━━━━━━━━━━━━━━━━━━━`,`${t[0].name}  vs  ${t[1].name}`,`${t[0].players.join(" & ")}  vs  ${t[1].players.join(" & ")}`,`━━━━━━━━━━━━━━━━━━━━━━`,""];game.rounds.forEach((r,i)=>{const hc=r.court?.[0]||r.court?.[1],wn=r.won[0]?t[0].name:r.won[1]?t[1].name:"—",sh=r.shuffler?"  🃏"+r.shuffler:"";lines.push(`Rd ${i+1}  ${r.trump||"—"}  ${r.tricks[0]}-${r.tricks[1]}${hc?" 👑":""}  → ${wn}${sh}${r.ts?"  ["+fmt(r.ts)+"]":""}`)});lines.push("","━━━━━━━━━━━━━━━━━━━━━━",`SCORE  ${t[0].name}: ${scores[0]}  |  ${t[1].name}: ${scores[1]}`,"",`Updated: ${fmt(game.updatedAt)}`,"Scored with Court Piece app");return lines.join("\n")}
+
+// ── Speech — uses device default voice, just sets language ────────────────────
+function speak(text,lang,onEnd){
+  if(!window.speechSynthesis)return;
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang=lang==="hi"?"hi-IN":"en-US";
+  u.rate=0.9;
+  u.onend=onEnd||function(){};
+  u.onerror=onEnd||function(){};
+  window.speechSynthesis.speak(u);
+}
+function scoreSpeech(game,scores,lang){
+  const t=game.teams,diff=Math.abs(scores[0]-scores[1]),lead=scores[0]>scores[1]?0:scores[1]>scores[0]?1:-1;
+  if(lang==="hi"){
+    const n=game.name?game.name+" ka ":"";
+    return n+"abhi ka score. "+t[0].name+": "+scores[0]+" point. "+t[1].name+": "+scores[1]+" point. "+(lead===-1?"Dono team barabar hain.":t[lead].name+" "+diff+" point aage hai.");
+  }
+  const n=game.name?"Game "+game.name+". ":"";
+  return n+"Current score. "+t[0].name+": "+scores[0]+" points. "+t[1].name+": "+scores[1]+" points. "+(lead===-1?"Scores are level.":t[lead].name+" leads by "+diff+(diff===1?" point.":" points."));
+}
+function courtSpeech(win,lose,lang){
+  if(lang==="hi")return"Dhamakedar! "+win+" ne court maar diya hai aur "+lose+" ki sharmnaak haar. Na na na na, puppu!";
+  return win+" has won the court! What a dominant performance! "+lose+" is defeated!";
+}
+function historySpeech(game,scores,lang){
+  const t=game.teams;
+  if(lang==="hi"){
+    const lines=game.rounds.map((r,i)=>{const wi=r.won[0]?t[0].name:r.won[1]?t[1].name:"koi nahi";return"Round "+(i+1)+": "+t[0].name+" "+r.tricks[0]+", "+t[1].name+" "+r.tricks[1]+". "+wi+" jeet gaya"+(r.court&&(r.court[0]||r.court[1])?", court ke saath!":".")});
+    return[...lines,"Total score: "+t[0].name+" "+scores[0]+", "+t[1].name+" "+scores[1]+"."].join(" ");
+  }
+  const lines=game.rounds.map((r,i)=>{const wi=r.won[0]?t[0].name:r.won[1]?t[1].name:"no winner";return"Round "+(i+1)+": "+t[0].name+" "+r.tricks[0]+", "+t[1].name+" "+r.tricks[1]+". Won by "+wi+(r.court&&(r.court[0]||r.court[1])?", court!":".")});
+  return[...lines,"Final score: "+t[0].name+" "+scores[0]+", "+t[1].name+" "+scores[1]+"."].join(" ");
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+function App(){
+  const[games,setGR]=useState(()=>load(GK)||[]);
+  const[activeId,setAR]=useState(()=>load(AK));
+  const[screen,setScreen]=useState("home");
+  const[round,setRound]=useState(newRound());
+  const[toast,setToast]=useState(null);
+  const[lang,setLR]=useState(()=>load(LK)||"en");
+
+  const setGames=useCallback(fn=>{setGR(p=>{const n=typeof fn==="function"?fn(p):fn;save(GK,n);return n});},[]);
+  const setActiveId=useCallback(id=>{setAR(id);save(AK,id);},[]);
+  const setLang=useCallback(l=>{setLR(l);save(LK,l);},[]);
+  const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(null),2500)};
+  const game=games.find(g=>g.id===activeId)??null;
+  const scores=game?calcScores(game.rounds):[0,0];
+  const upd=useCallback(p=>setGames(gs=>gs.map(g=>g.id===activeId?{...g,...p,updatedAt:new Date().toISOString()}:g)),[activeId,setGames]);
+  const go=id=>{setActiveId(id);setRound(newRound());setScreen("game")};
+  const del=id=>{setGames(gs=>gs.filter(g=>g.id!==id));if(activeId===id){setActiveId(null);setScreen("home")}};
+  const exp=()=>{
+    const d=JSON.stringify(games,null,2);
+    const fb=()=>{const el=document.createElement("textarea");el.value=d;el.style.cssText="position:fixed;opacity:0";document.body.appendChild(el);el.focus();el.select();try{document.execCommand("copy")}catch{}document.body.removeChild(el)};
+    navigator.clipboard?.writeText(d).catch(fb)||fb();
+    showToast("Copied! Paste in Import Games.");
+  };
+
+  return(
+    <div style={{minHeight:"100vh",background:"white"}}>
+      {screen==="home"&&<Home games={games} activeId={activeId} onNew={()=>setScreen("setup")} onSelect={go} onDelete={del} onExport={exp} onImport={()=>setScreen("import")}/>}
+      {screen==="setup"&&<Setup onBack={()=>setScreen("home")} onStart={g=>{setGames(gs=>[...gs,g]);go(g.id)}}/>}
+      {screen==="game"&&game&&<Game game={game} scores={scores} round={round} setRound={setRound}
+        onSubmit={nr=>{upd({rounds:[...game.rounds,nr]});setRound(newRound());
+          const isC=nr.court[0]||nr.court[1],cW=nr.court[0]?game.teams[0].name:game.teams[1].name,cL=nr.court[0]?game.teams[1].name:game.teams[0].name;
+          showToast(isC?`👑 Court! +${COURT_BONUS} for ${cW}!`:`Round ${game.rounds.length+1} recorded!`);
+          if(isC)speak(courtSpeech(cW,cL,lang),lang,null);
+        }}
+        onEditTeams={()=>setScreen("editTeams")} onHistory={()=>setScreen("history")}
+        onShare={()=>setScreen("share")} onEnd={()=>{upd({finished:true});setScreen("home");showToast("Game saved!")}}
+        onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang}/>}
+      {screen==="editTeams"&&game&&<EditTeams teams={game.teams} onBack={()=>setScreen("game")} onSave={t=>{upd({teams:t});setScreen("game");showToast("Teams updated!")}}/>}
+      {screen==="history"&&game&&<History game={game} scores={scores} onBack={()=>setScreen("game")} onShare={()=>setScreen("share")} lang={lang}/>}
+      {screen==="share"&&game&&<Share game={game} scores={scores} onBack={()=>setScreen("game")} showToast={showToast} lang={lang}/>}
+      {screen==="import"&&<Import onBack={()=>setScreen("home")} onImport={imp=>{setGames(ex=>{const ids=new Set(ex.map(g=>g.id));return[...ex,...imp.filter(g=>!ids.has(g.id))]});showToast("Imported!");setScreen("home")}}/>}
+      <Toast msg={toast}/>
+    </div>
+  );
+}
+
+function Home({games,activeId,onNew,onSelect,onDelete,onExport,onImport}){
+  const[conf,setConf]=useState(null);
+  return(
+    <div style={{padding:"52px 20px 40px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+        <span style={{fontSize:28}}>🃏</span>
+        <h1 style={{margin:0,fontSize:30,fontWeight:800,color:"#111",letterSpacing:-1}}>Court Piece</h1>
+      </div>
+      <p style={{margin:"0 0 20px",color:"#888",fontSize:14}}>Games are saved automatically</p>
+      <Btn primary onClick={onNew}>+ New Game</Btn>
+      <div style={{height:10}}/>
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={onExport} style={{flex:1,background:"#f0f5ff",border:"1.5px solid #c7d9ff",borderRadius:14,padding:11,fontSize:13,fontWeight:700,color:"#4a7cfc",cursor:"pointer"}}>📤 Export</button>
+        <button onClick={onImport} style={{flex:1,background:"#f0fff4",border:"1.5px solid #bbf7d0",borderRadius:14,padding:11,fontSize:13,fontWeight:700,color:"#16a34a",cursor:"pointer"}}>📥 Import</button>
+      </div>
+      {games.length>0&&(
+        <div style={{marginTop:24}}>
+          <Lbl>Saved Games</Lbl>
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:8}}>
+            {[...games].reverse().map(g=>{
+              const sc=calcScores(g.rounds),isA=activeId===g.id;
+              return(
+                <div key={g.id}>
+                  <div style={{display:"flex",gap:8}}>
+                    <div onClick={()=>onSelect(g.id)} style={{flex:1,background:isA?"#f0f5ff":"#f7f7f7",border:isA?"2px solid #4a7cfc":"2px solid transparent",borderRadius:16,padding:"14px 16px",cursor:"pointer"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontWeight:700,fontSize:15,color:"#111"}}>{g.name||"Unnamed Game"}</div>
+                          <div style={{fontSize:12,color:"#888",marginTop:2}}>{g.teams[0].name} vs {g.teams[1].name} · {g.rounds.length} rounds</div>
+                          <div style={{fontSize:11,color:"#bbb",marginTop:3}}>{g.updatedAt?`Saved ${fmt(g.updatedAt)}`:fmt(g.createdAt)}</div>
+                        </div>
+                        <div style={{textAlign:"right",marginLeft:12}}>
+                          <div style={{fontWeight:800,fontSize:20,color:"#111"}}>{sc[0]} – {sc[1]}</div>
+                          <div style={{fontSize:10,fontWeight:700,marginTop:2,color:g.finished?"#4a7cfc":"#22c55e"}}>{g.finished?"FINISHED":"IN PROGRESS"}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={()=>setConf(g.id)} style={{width:44,background:"#fff0f0",border:"none",borderRadius:14,cursor:"pointer",fontSize:16,color:"#e63946"}}>🗑</button>
+                  </div>
+                  {conf===g.id&&(
+                    <div style={{background:"#fff0f0",border:"1.5px solid #fca5a5",borderRadius:12,padding:"10px 14px",marginTop:6,display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:13,color:"#b91c1c",flex:1}}>Delete this game?</span>
+                      <button onClick={()=>{onDelete(g.id);setConf(null)}} style={{background:"#e63946",border:"none",color:"white",borderRadius:8,padding:"6px 12px",fontWeight:700,fontSize:13,cursor:"pointer"}}>Delete</button>
+                      <button onClick={()=>setConf(null)} style={{background:"#f2f2f2",border:"none",borderRadius:8,padding:"6px 12px",fontWeight:600,fontSize:13,cursor:"pointer"}}>Cancel</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {games.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"#ccc",fontSize:14}}>No saved games yet.<br/>Tap + New Game to start!</div>}
+    </div>
+  );
+}
+
+function Setup({onBack,onStart}){
+  const[d,setD]=useState(newGame);
+  const st=(ti,f,v)=>setD(g=>{const t=JSON.parse(JSON.stringify(g.teams));if(f==="name")t[ti].name=v;else t[ti].players[f]=v;return{...g,teams:t}});
+  const ok=d.teams[0].name.trim()&&d.teams[1].name.trim()&&d.teams.every(t=>t.players.every(p=>p.trim()));
+  return(
+    <div style={{padding:"48px 20px 40px"}}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <h1 style={PT}>New Game</h1>
+      <div style={{display:"flex",flexDirection:"column",gap:16,marginTop:20}}>
+        <Card><Lbl>Game Name <M>(optional)</M></Lbl><Inp value={d.name} placeholder="e.g. Friday Night" onChange={v=>setD(g=>({...g,name:v}))}/></Card>
+        {[0,1].map(ti=>(
+          <Card key={ti}>
+            <Lbl>Team {ti+1}</Lbl>
+            <Inp bold value={d.teams[ti].name} placeholder={`Team ${ti+1} name`} onChange={v=>st(ti,"name",v)}/>
+            <div style={{height:10}}/>
+            {[0,1].map(pi=><div key={pi} style={{marginBottom:pi===0?8:0}}><Inp value={d.teams[ti].players[pi]} placeholder={`Player ${pi+1}`} onChange={v=>st(ti,pi,v)}/></div>)}
+          </Card>
+        ))}
+        <Btn primary disabled={!ok} onClick={()=>onStart({...d,id:Date.now()})}>Start Game →</Btn>
+      </div>
+    </div>
+  );
+}
+
+function EditTeams({teams,onBack,onSave}){
+  const[d,setD]=useState(()=>JSON.parse(JSON.stringify(teams)));
+  const st=(ti,f,v)=>setD(t=>{const x=JSON.parse(JSON.stringify(t));if(f==="name")x[ti].name=v;else x[ti].players[f]=v;return x});
+  return(
+    <div style={{padding:"48px 20px 40px"}}>
+      <button onClick={onBack} style={BK}>← Cancel</button>
+      <h1 style={PT}>Edit Teams</h1>
+      <div style={{display:"flex",flexDirection:"column",gap:16,marginTop:20}}>
+        {[0,1].map(ti=>(
+          <Card key={ti}>
+            <Lbl>Team {ti+1}</Lbl>
+            <Inp bold value={d[ti].name} placeholder={`Team ${ti+1} name`} onChange={v=>st(ti,"name",v)}/>
+            <div style={{height:10}}/>
+            {[0,1].map(pi=><div key={pi} style={{marginBottom:pi===0?8:0}}><Inp value={d[ti].players[pi]} placeholder={`Player ${pi+1}`} onChange={v=>st(ti,pi,v)}/></div>)}
+          </Card>
+        ))}
+        <Btn primary onClick={()=>onSave(d)}>Save Changes</Btn>
+      </div>
+    </div>
+  );
+}
+
+function Game({game,scores,round:r,setRound,onSubmit,onEditTeams,onHistory,onShare,onEnd,onHome,showToast,lang,setLang}){
+  const rn=game.rounds.length+1;
+  const t0=r.tricks[0]!==""?Number(r.tricks[0]):null,t1=r.tricks[1]!==""?Number(r.tricks[1]):null;
+  const sum=t0!==null&&t1!==null?t0+t1:null,ok=t0!==null&&t1!==null&&sum===13;
+  const[spk,setSpk]=useState(false);
+  const doSpeak=()=>{if(!window.speechSynthesis){showToast("Speech not supported");return}if(spk){window.speechSynthesis.cancel();setSpk(false);return}setSpk(true);speak(scoreSpeech(game,scores,lang),lang,()=>setSpk(false))};
+  const submit=()=>{const n0=Number(r.tricks[0]),n1=Number(r.tricks[1]);onSubmit({trump:r.trump,tricks:[n0,n1],won:[n0>=7,n1>=7],court:[n0===13,n1===13],round:rn,shuffler:r.shuffler||null,ts:new Date().toISOString()})};
+  const setT=(ti,n)=>{const t=[...r.tricks];t[ti]=String(n);t[1-ti]=String(13-n);setRound(c=>({...c,tricks:t}))};
+  return(
+    <div>
+      <div style={{padding:"48px 20px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div style={{flex:1}}>
+          <button onClick={onHome} style={BK}>← Games</button>
+          <h1 style={{...PT,fontSize:19,marginTop:0}}>{game.name||`${game.teams[0].name} vs ${game.teams[1].name}`}</h1>
+          <p style={{margin:"2px 0 0",color:"#bbb",fontSize:12}}>Round {rn} · Saved {fmt(game.updatedAt)}</p>
+        </div>
+        <div style={{display:"flex",gap:8,paddingTop:28}}>
+          <Pill onClick={onEditTeams}>✏️</Pill>
+          <Pill onClick={onHistory}>History</Pill>
+        </div>
+      </div>
+      <div style={{margin:"14px 20px 0",background:"#f7f7f7",borderRadius:20,padding:14,display:"flex",gap:10}}>
+        {[0,1].map(ti=>(
+          <div key={ti} style={{flex:1,background:"white",borderRadius:14,padding:"14px 10px",textAlign:"center",boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
+            <div style={{fontSize:11,color:"#999",textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:4}}>{game.teams[ti].name}</div>
+            <div style={{fontSize:40,fontWeight:900,color:"#111",lineHeight:1}}>{scores[ti]}</div>
+            <div style={{fontSize:11,color:"#bbb",marginTop:4}}>{game.teams[ti].players.join(" & ")}</div>
+          </div>
+        ))}
+        <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+          <button onClick={doSpeak} style={{width:52,height:52,background:spk?"#4a7cfc":"white",borderRadius:14,border:"none",cursor:"pointer",fontSize:22,boxShadow:"0 2px 8px rgba(0,0,0,0.06)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {spk?"🔇":"🔊"}
+          </button>
+          <button onClick={()=>setLang(lang==="en"?"hi":"en")} style={{width:52,height:28,background:"#f2f2f2",borderRadius:10,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,color:"#555"}}>
+            {lang==="en"?"हिंदी":"ENG"}
+          </button>
+        </div>
+      </div>
+      <div style={{padding:"14px 20px 40px",display:"flex",flexDirection:"column",gap:14}}>
+        <Card>
+          <Lbl>Trump Suit <M>(optional)</M></Lbl>
+          <div style={{display:"flex",gap:8,justifyContent:"center"}}>
+            {SUITS.map(s=>{const sel=r.trump===s,red=RED.has(s);return(
+              <button key={s} onClick={()=>setRound(c=>({...c,trump:sel?null:s}))}
+                style={{width:56,height:56,borderRadius:14,fontSize:26,cursor:"pointer",background:sel?(red?"#fff0f0":"#f0f4ff"):"#f7f7f7",border:sel?`2px solid ${red?"#e63946":"#4a7cfc"}`:"2px solid #ebebeb",color:red?"#e63946":"#1a1a2e",transform:sel?"scale(1.1)":"scale(1)",transition:"all 0.15s",boxShadow:sel?"0 4px 12px rgba(0,0,0,0.1)":"none"}}>{s}</button>
+            )})}
+          </div>
+        </Card>
+        <Shuffler players={[...game.teams[0].players,...game.teams[1].players]} value={r.shuffler} onChange={v=>setRound(c=>({...c,shuffler:v}))} lang={lang}/>
+        <Card>
+          <Lbl>Tricks Won <M>(must total 13)</M></Lbl>
+          <div style={{display:"flex",gap:12}}>
+            {[0,1].map(ti=>(
+              <div key={ti} style={{flex:1}}>
+                <div style={{fontSize:12,color:"#555",fontWeight:700,textAlign:"center",marginBottom:8}}>{game.teams[ti].name}</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5,justifyContent:"center"}}>
+                  {[...Array(14)].map((_,n)=>{
+                    const ov=r.tricks[1-ti]!==""?Number(r.tricks[1-ti]):null,dis=ov!==null&&n+ov>13,sel=r.tricks[ti]===String(n),ic=n===13;
+                    return<button key={n} disabled={dis} onClick={()=>setT(ti,n)} style={{width:34,height:34,borderRadius:10,fontSize:ic?16:13,cursor:dis?"not-allowed":"pointer",fontWeight:sel?800:500,background:sel?(ic?"#fff3cd":"#4a7cfc"):dis?"#fafafa":"#f2f2f2",color:sel?(ic?"#856404":"white"):dis?"#ccc":"#333",border:sel?(ic?"2px solid #ffc107":"2px solid #4a7cfc"):"2px solid transparent",transition:"all 0.12s"}}>{ic?"👑":n}</button>;
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          {sum!==null&&sum!==13&&<div style={{marginTop:10,color:"#e63946",fontSize:12,textAlign:"center",fontWeight:600}}>⚠ Total is {sum}, must be 13</div>}
+          {(r.tricks[0]==="13"||r.tricks[1]==="13")&&<div style={{marginTop:10,background:"#fff8e1",border:"1px solid #ffc107",borderRadius:10,padding:"8px 12px",fontSize:13,color:"#856404",textAlign:"center"}}>👑 Court! +{COURT_BONUS} bonus points will be added</div>}
+        </Card>
+        <Btn primary disabled={!ok} onClick={submit}>Record Round {rn}{r.trump?" "+r.trump:""}</Btn>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={onShare} style={SB}>📤 Share</button>
+          <button onClick={()=>{if(window.confirm("End this game?"))onEnd()}} style={SB}>🏁 End Game</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Shuffler({players,value,onChange,lang}){
+  const[picked,setPicked]=useState(null);
+  const[spin,setSpin]=useState(false);
+  const pick=()=>{
+    if(spin)return;setSpin(true);setPicked(null);let c=0;
+    const iv=setInterval(()=>{
+      setPicked(players[Math.floor(Math.random()*players.length)]);c++;
+      if(c>=12){clearInterval(iv);const w=players[Math.floor(Math.random()*players.length)];setPicked(w);onChange(w);setSpin(false);
+        speak((lang==="hi"?w+" cards shuffle karega!":w+" will shuffle the cards!"),lang,null);
+      }
+    },80);
+  };
+  return(
+    <Card>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <Lbl style={{margin:0}}>Shuffler <M>(optional)</M></Lbl>
+        <button onClick={pick} disabled={spin} style={{background:spin?"#f0f0f0":"#f0f5ff",border:"1.5px solid #c7d9ff",borderRadius:20,padding:"5px 12px",fontSize:12,fontWeight:700,color:spin?"#aaa":"#4a7cfc",cursor:spin?"not-allowed":"pointer"}}>
+          {spin?"🎲 Picking…":"🎲 Random Pick"}
+        </button>
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        {players.filter(p=>p&&p.trim()).map(p=>{const sel=value===p;return(
+          <button key={p} onClick={()=>{onChange(sel?null:p);setPicked(sel?null:p)}}
+            style={{padding:"8px 14px",borderRadius:20,fontSize:13,fontWeight:700,cursor:"pointer",transition:"all 0.15s",background:sel?"#4a7cfc":(picked===p&&spin?"#fff3cd":"#f2f2f2"),color:sel?"white":(picked===p&&spin?"#856404":"#444"),border:sel?"2px solid #4a7cfc":"2px solid transparent",transform:picked===p&&spin?"scale(1.08)":"scale(1)"}}>{p}</button>
+        )})}
+        {value&&<button onClick={()=>{onChange(null);setPicked(null)}} style={{padding:"8px 12px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:"#fff0f0",color:"#e63946",border:"none"}}>✕</button>}
+      </div>
+      {value&&!spin&&<div style={{marginTop:10,fontSize:13,color:"#4a7cfc",fontWeight:600,textAlign:"center"}}>🃏 {value} is shuffling</div>}
+    </Card>
+  );
+}
+
+function History({game,scores,onBack,onShare,lang}){
+  const[spk,setSpk]=useState(false);
+  const doSpeak=()=>{if(!window.speechSynthesis)return;if(spk){window.speechSynthesis.cancel();setSpk(false);return}setSpk(true);speak(historySpeech(game,scores,lang),lang,()=>setSpk(false))};
+  return(
+    <div style={{padding:"48px 20px 40px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div><button onClick={onBack} style={BK}>← Back</button><h1 style={PT}>Round History</h1><p style={{margin:"2px 0 16px",color:"#999",fontSize:13}}>{game.rounds.length} rounds played</p></div>
+        <button onClick={doSpeak} style={{background:spk?"#4a7cfc":"#f2f2f2",border:"none",borderRadius:14,width:44,height:44,fontSize:20,cursor:"pointer",marginTop:28}}>{spk?"🔇":"🔊"}</button>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {game.rounds.length===0&&<div style={{color:"#bbb",textAlign:"center",padding:40}}>No rounds yet</div>}
+        {[...game.rounds].reverse().map((r,i)=>{
+          const ri=game.rounds.length-i,wi=r.won[0]?0:r.won[1]?1:null;
+          const pts=[r.won[0]?1+(r.court?.[0]?COURT_BONUS:0):0,r.won[1]?1+(r.court?.[1]?COURT_BONUS:0):0];
+          return(
+            <div key={i} style={{background:"#f7f7f7",borderRadius:16,padding:"14px 16px",display:"flex",gap:12,alignItems:"center"}}>
+              <div style={{width:36,height:36,borderRadius:10,background:"white",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,boxShadow:"0 1px 4px rgba(0,0,0,0.08)",flexShrink:0}}>{r.trump||"🃏"}</div>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",justifyContent:"space-between"}}>
+                  <div style={{fontSize:11,color:"#999",fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>Round {ri}</div>
+                  {r.ts&&<div style={{fontSize:10,color:"#ccc"}}>{fmt(r.ts)}</div>}
+                </div>
+                <div style={{fontSize:15,fontWeight:700,color:"#111",marginTop:2}}>{r.tricks[0]} – {r.tricks[1]}{(r.court?.[0]||r.court?.[1])&&<span style={{marginLeft:6}}>👑</span>}</div>
+                <div style={{fontSize:12,color:"#888"}}>{game.teams[0].name} +{pts[0]} | {game.teams[1].name} +{pts[1]}</div>
+                {r.shuffler&&<div style={{fontSize:11,color:"#aaa",marginTop:2}}>🃏 Shuffled by {r.shuffler}</div>}
+              </div>
+              {wi!==null&&<div style={{background:"#e8f0fe",color:"#4a7cfc",fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:8,flexShrink:0}}>{game.teams[wi].name}</div>}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{marginTop:16}}><Btn onClick={onShare}>Share Scorecard</Btn></div>
+    </div>
+  );
+}
+
+function Share({game,scores,onBack,showToast,lang}){
+  const[mode,setMode]=useState("score");
+  const[spk,setSpk]=useState(false);
+  const text=mode==="score"?scoreText(game,scores):fullText(game,scores);
+  const wa=`https://wa.me/?text=${encodeURIComponent(text)}`;
+  const doSpeak=()=>{if(!window.speechSynthesis){showToast("Not supported");return}if(spk){window.speechSynthesis.cancel();setSpk(false);return}setSpk(true);speak(scoreSpeech(game,scores,lang),lang,()=>setSpk(false))};
+  const copy=()=>{const fb=()=>{const el=document.createElement("textarea");el.value=text;el.style.cssText="position:fixed;opacity:0";document.body.appendChild(el);el.focus();el.select();try{document.execCommand("copy")}catch{}document.body.removeChild(el);showToast("Copied!")};navigator.clipboard?.writeText(text).then(()=>showToast("Copied!")).catch(fb)||fb()};
+  return(
+    <div style={{padding:"48px 20px 40px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div><button onClick={onBack} style={BK}>← Back</button><h1 style={PT}>Share Score</h1></div>
+        <button onClick={doSpeak} style={{background:spk?"#4a7cfc":"#f2f2f2",border:"none",borderRadius:14,width:44,height:44,fontSize:20,cursor:"pointer",marginTop:28}}>{spk?"🔇":"🔊"}</button>
+      </div>
+      <div style={{display:"flex",background:"#f2f2f2",borderRadius:12,padding:4,gap:4,margin:"16px 0 12px"}}>
+        {[["score","Score Only"],["full","Full History"]].map(([v,l])=>(
+          <button key={v} onClick={()=>setMode(v)} style={{flex:1,padding:9,borderRadius:9,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:mode===v?"white":"transparent",color:mode===v?"#111":"#888",boxShadow:mode===v?"0 1px 4px rgba(0,0,0,0.1)":"none"}}>{l}</button>
+        ))}
+      </div>
+      <div style={{background:"#f7f7f7",borderRadius:16,padding:16,fontFamily:"monospace",fontSize:12,lineHeight:1.8,color:"#333",whiteSpace:"pre-wrap",marginBottom:14,maxHeight:260,overflowY:"auto"}}>{text}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <a href={wa} target="_blank" rel="noopener noreferrer" style={{display:"block",width:"100%",padding:15,borderRadius:16,fontSize:16,fontWeight:700,textAlign:"center",textDecoration:"none",background:"#25D366",color:"white",boxSizing:"border-box"}}>💬 Share on WhatsApp</a>
+        <button onClick={copy} style={{width:"100%",padding:15,borderRadius:16,fontSize:16,fontWeight:700,background:"#f2f2f2",color:"#333",border:"none",cursor:"pointer"}}>📋 Copy to Clipboard</button>
+      </div>
+    </div>
+  );
+}
+
+function Import({onBack,onImport}){
+  const[raw,setRaw]=useState(""),[err,setErr]=useState("");
+  const go=()=>{setErr("");try{const p=JSON.parse(raw.trim());if(!Array.isArray(p)){setErr("Must be a JSON array.");return}if(!p.every(g=>g.id&&g.teams&&Array.isArray(g.rounds))){setErr("Some games have missing fields.");return}onImport(p)}catch{setErr("Cannot parse. Paste the full export text.")}};
+  return(
+    <div style={{padding:"48px 20px 40px"}}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <h1 style={PT}>Import Games</h1>
+      <div style={{background:"#fff8e1",border:"1px solid #ffc107",borderRadius:14,padding:"12px 14px",margin:"16px 0",fontSize:13,color:"#856404",lineHeight:1.6}}>
+        1. Open old app → tap <strong>📤 Export</strong><br/>2. Data copies to clipboard<br/>3. Paste below → Import
+      </div>
+      <textarea value={raw} onChange={e=>{setRaw(e.target.value);setErr("")}} placeholder="Paste exported game data here…"
+        style={{width:"100%",minHeight:160,background:"#f7f7f7",border:"1.5px solid #e8e8e8",borderRadius:14,padding:"12px 14px",fontSize:13,fontFamily:"monospace",boxSizing:"border-box",outline:"none",resize:"vertical"}}/>
+      {err&&<div style={{color:"#e63946",fontSize:13,marginTop:8}}>⚠ {err}</div>}
+      <div style={{marginTop:14}}><Btn primary disabled={!raw.trim()} onClick={go}>Import Games</Btn></div>
+    </div>
+  );
+}
+
+function Card({children,style={}}){return<div style={{background:"#f7f7f7",borderRadius:18,padding:"16px 14px",...style}}>{children}</div>}
+function Lbl({children,style={}}){return<div style={{fontSize:12,fontWeight:700,color:"#888",textTransform:"uppercase",letterSpacing:0.8,marginBottom:10,...style}}>{children}</div>}
+function M({children}){return<span style={{color:"#bbb",fontWeight:400,textTransform:"none",letterSpacing:0}}>{children}</span>}
+function Inp({value,onChange,placeholder,bold}){return<input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{background:"white",border:"1.5px solid #e8e8e8",borderRadius:12,padding:"11px 14px",fontSize:bold?17:15,color:"#111",fontWeight:bold?700:400,width:"100%",boxSizing:"border-box",outline:"none"}}/>}
+function Btn({children,onClick,primary,disabled}){return<button onClick={onClick} disabled={disabled} style={{width:"100%",padding:15,borderRadius:16,fontSize:16,fontWeight:700,cursor:disabled?"not-allowed":"pointer",background:disabled?"#f0f0f0":primary?"#111":"#f2f2f2",color:disabled?"#bbb":primary?"white":"#333",border:"none"}}>{children}</button>}
+function Pill({children,onClick}){return<button onClick={onClick} style={{background:"#f2f2f2",border:"none",borderRadius:20,padding:"7px 13px",fontSize:13,fontWeight:600,color:"#555",cursor:"pointer"}}>{children}</button>}
+function Toast({msg}){if(!msg)return null;return<div style={{position:"fixed",bottom:36,left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,0.82)",borderRadius:24,color:"white",padding:"11px 22px",fontSize:14,fontWeight:600,zIndex:999,whiteSpace:"nowrap",pointerEvents:"none"}}>{msg}</div>}
+const BK={background:"none",border:"none",color:"#4a7cfc",fontSize:14,fontWeight:600,cursor:"pointer",padding:"0 0 8px",display:"block"};
+const PT={margin:0,fontSize:26,fontWeight:800,color:"#111",letterSpacing:-0.5};
+const SB={flex:1,background:"#f2f2f2",border:"none",color:"#555",padding:13,borderRadius:14,cursor:"pointer",fontSize:14,fontWeight:600};
+
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>
