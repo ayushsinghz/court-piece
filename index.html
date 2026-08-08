@@ -63,7 +63,7 @@ function scoreSpeech(game,scores,lang){
   return n+"Current score. "+t[0].name+": "+scores[0]+" points. "+t[1].name+": "+scores[1]+" points. "+(lead===-1?"Scores are level.":t[lead].name+" leads by "+diff+(diff===1?" point.":" points."));
 }
 function courtSpeech(win,lose,lang){
-  if(lang==="hi")return"Takhta palat! "+win+" ne court maar diya hai aur "+lose+" ki sharmnaak haar. Na na na na, poo poo!";
+  if(lang==="hi")return"Takhta Palat! "+win+" ne court maar diya hai aur "+lose+" ki sharmnaak haar. Na na na na, poo poo!";
   return win+" has won the court! What a dominant performance! "+lose+" is defeated!";
 }
 function historySpeech(game,scores,lang){
@@ -113,7 +113,7 @@ function App(){
         }}
         onEditTeams={()=>setScreen("editTeams")} onHistory={()=>setScreen("history")}
         onShare={()=>setScreen("share")} onEnd={()=>{upd({finished:true});setScreen("home");showToast("Game saved!")}}
-        onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang}/>}
+        onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang} setScreen={setScreen}/>}
       {screen==="editTeams"&&game&&<EditTeams teams={game.teams} onBack={()=>setScreen("game")} onSave={t=>{upd({teams:t});setScreen("game");showToast("Teams updated!")}}/>}
       {screen==="history"&&game&&<History game={game} scores={scores} onBack={()=>setScreen("game")} onShare={()=>setScreen("share")} lang={lang}/>}
       {screen==="share"&&game&&<Share game={game} scores={scores} onBack={()=>setScreen("game")} showToast={showToast} lang={lang}/>}
