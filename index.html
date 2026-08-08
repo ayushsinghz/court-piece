@@ -63,7 +63,7 @@ function scoreSpeech(game,scores,lang){
   return n+"Current score. "+t[0].name+": "+scores[0]+" points. "+t[1].name+": "+scores[1]+" points. "+(lead===-1?"Scores are level.":t[lead].name+" leads by "+diff+(diff===1?" point.":" points."));
 }
 function courtSpeech(win,lose,lang){
-  if(lang==="hi")return"Takhtaa Palat! "+win+" ne court maar diya hai aur "+lose+" ki sharmnaak haar. Na na na na, poo poo!";
+  if(lang==="hi")return"Takhta palat! "+win+" ne court maar diya hai aur "+lose+" ki sharmnaak haar. Na na na na, poo poo!";
   return win+" has won the court! What a dominant performance! "+lose+" is defeated!";
 }
 function historySpeech(game,scores,lang){
@@ -103,7 +103,7 @@ function App(){
 
   return(
     <div style={{minHeight:"100vh",background:"white"}}>
-      {screen==="home"&&<Home games={games} activeId={activeId} onNew={()=>setScreen("setup")} onSelect={go} onDelete={del} onExport={exp} onImport={()=>setScreen("import")}/>}
+      {screen==="home"&&<Home games={games} activeId={activeId} onNew={()=>setScreen("setup")} onSelect={go} onDelete={del} onExport={exp} onImport={()=>setScreen("import")} onDashboard={id=>{setActiveId(id);setScreen("dashboard");save("cp:dashback","home")}}/>}
       {screen==="setup"&&<Setup onBack={()=>setScreen("home")} onStart={g=>{setGames(gs=>[...gs,g]);go(g.id)}}/>}
       {screen==="game"&&game&&<Game game={game} scores={scores} round={round} setRound={setRound}
         onSubmit={nr=>{upd({rounds:[...game.rounds,nr]});setRound(newRound());
@@ -118,12 +118,13 @@ function App(){
       {screen==="history"&&game&&<History game={game} scores={scores} onBack={()=>setScreen("game")} onShare={()=>setScreen("share")} lang={lang}/>}
       {screen==="share"&&game&&<Share game={game} scores={scores} onBack={()=>setScreen("game")} showToast={showToast} lang={lang}/>}
       {screen==="import"&&<Import onBack={()=>setScreen("home")} onImport={imp=>{setGames(ex=>{const ids=new Set(ex.map(g=>g.id));return[...ex,...imp.filter(g=>!ids.has(g.id))]});showToast("Imported!");setScreen("home")}}/>}
+      {screen==="dashboard"&&game&&<Dashboard game={game} scores={scores} onBack={()=>setScreen(load("cp:dashback")||"game")}/>}
       <Toast msg={toast}/>
     </div>
   );
 }
 
-function Home({games,activeId,onNew,onSelect,onDelete,onExport,onImport}){
+function Home({games,activeId,onNew,onSelect,onDelete,onExport,onImport,onDashboard}){
   const[conf,setConf]=useState(null);
   return(
     <div style={{padding:"52px 20px 40px"}}>
@@ -160,6 +161,7 @@ function Home({games,activeId,onNew,onSelect,onDelete,onExport,onImport}){
                         </div>
                       </div>
                     </div>
+                    <button onClick={(e)=>{e.stopPropagation();onDashboard(g.id)}} style={{width:44,background:"#f0f5ff",border:"none",borderRadius:14,cursor:"pointer",fontSize:16,color:"#4a7cfc"}}>📊</button>
                     <button onClick={()=>setConf(g.id)} style={{width:44,background:"#fff0f0",border:"none",borderRadius:14,cursor:"pointer",fontSize:16,color:"#e63946"}}>🗑</button>
                   </div>
                   {conf===g.id&&(
@@ -226,7 +228,7 @@ function EditTeams({teams,onBack,onSave}){
   );
 }
 
-function Game({game,scores,round:r,setRound,onSubmit,onEditTeams,onHistory,onShare,onEnd,onHome,showToast,lang,setLang}){
+function Game({game,scores,round:r,setRound,onSubmit,onEditTeams,onHistory,onShare,onEnd,onHome,showToast,lang,setLang,setScreen}){
   const rn=game.rounds.length+1;
   const t0=r.tricks[0]!==""?Number(r.tricks[0]):null,t1=r.tricks[1]!==""?Number(r.tricks[1]):null;
   const sum=t0!==null&&t1!==null?t0+t1:null,ok=t0!==null&&t1!==null&&sum===13;
@@ -296,7 +298,10 @@ function Game({game,scores,round:r,setRound,onSubmit,onEditTeams,onHistory,onSha
         <Btn primary disabled={!ok} onClick={submit}>Record Round {rn}{r.trump?" "+r.trump:""}</Btn>
         <div style={{display:"flex",gap:10}}>
           <button onClick={onShare} style={SB}>📤 Share</button>
-          <button onClick={()=>{if(window.confirm("End this game?"))onEnd()}} style={SB}>🏁 End Game</button>
+          <button onClick={()=>{save("cp:dashback","game");setScreen("dashboard")}} style={SB}>📊 Stats</button>
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>{if(window.confirm("End this game?"))onEnd()}} style={{...SB,flex:1}}>🏁 End Game</button>
         </div>
       </div>
     </div>
@@ -366,7 +371,9 @@ function History({game,scores,onBack,onShare,lang}){
           );
         })}
       </div>
-      <div style={{marginTop:16}}><Btn onClick={onShare}>Share Scorecard</Btn></div>
+      <div style={{marginTop:16,display:"flex",gap:10}}>
+        <Btn onClick={onShare}>Share Scorecard</Btn>
+      </div>
     </div>
   );
 }
@@ -394,6 +401,265 @@ function Share({game,scores,onBack,showToast,lang}){
         <a href={wa} target="_blank" rel="noopener noreferrer" style={{display:"block",width:"100%",padding:15,borderRadius:16,fontSize:16,fontWeight:700,textAlign:"center",textDecoration:"none",background:"#25D366",color:"white",boxSizing:"border-box"}}>💬 Share on WhatsApp</a>
         <button onClick={copy} style={{width:"100%",padding:15,borderRadius:16,fontSize:16,fontWeight:700,background:"#f2f2f2",color:"#333",border:"none",cursor:"pointer"}}>📋 Copy to Clipboard</button>
       </div>
+    </div>
+  );
+}
+
+
+function Dashboard({game,scores,onBack}){
+  const t=game.teams;
+  const rounds=game.rounds;
+
+  // ── Compute all insights ──────────────────────────────────────────────────
+  // Courts
+  const courts0=rounds.filter(r=>r.court&&r.court[0]).length;
+  const courts1=rounds.filter(r=>r.court&&r.court[1]).length;
+
+  // Wins / losses
+  const wins0=rounds.filter(r=>r.won[0]).length;
+  const wins1=rounds.filter(r=>r.won[1]).length;
+
+  // Biggest winning streak
+  function longestStreak(teamIdx){
+    let max=0,cur=0;
+    rounds.forEach(r=>{if(r.won[teamIdx]){cur++;max=Math.max(max,cur)}else cur=0});
+    return max;
+  }
+  const streak0=longestStreak(0),streak1=longestStreak(1);
+
+  // Current streak
+  function currentStreak(){
+    let t=-1,c=0;
+    for(let i=rounds.length-1;i>=0;i--){
+      const r=rounds[i];
+      const w=r.won[0]?0:r.won[1]?1:-1;
+      if(t===-1&&w!==-1){t=w;c=1}
+      else if(w===t)c++;
+      else break;
+    }
+    return{team:t,count:c};
+  }
+  const cs=currentStreak();
+
+  // Day-wise winner (group rounds by date, sum points per day)
+  const dayMap={};
+  rounds.forEach(r=>{
+    if(!r.ts)return;
+    const d=new Date(r.ts).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
+    if(!dayMap[d])dayMap[d]={pts:[0,0],courts:[0,0],rounds:0};
+    for(let i=0;i<2;i++){
+      if(r.won[i]){dayMap[d].pts[i]+=1+(r.court&&r.court[i]?6:0);}
+      if(r.court&&r.court[i])dayMap[d].courts[i]++;
+    }
+    dayMap[d].rounds++;
+  });
+  const days=Object.entries(dayMap).map(([date,v])=>({date,pts:v.pts,courts:v.courts,rounds:v.rounds,winner:v.pts[0]>v.pts[1]?0:v.pts[1]>v.pts[0]?1:-1}));
+  const dayWins0=days.filter(d=>d.winner===0).length;
+  const dayWins1=days.filter(d=>d.winner===1).length;
+  const dayTies=days.filter(d=>d.winner===-1).length;
+
+  // Highest score in a single day
+  const bestDay0=days.reduce((a,d)=>d.pts[0]>a?d.pts[0]:a,0);
+  const bestDay1=days.reduce((a,d)=>d.pts[1]>a?d.pts[1]:a,0);
+
+  // Most rounds in a day
+  const busiestDay=days.reduce((a,d)=>d.rounds>a.rounds?d:a,{rounds:0,date:"-"});
+
+  // Average tricks per round
+  const avgTricks0=(rounds.reduce((a,r)=>a+r.tricks[0],0)/Math.max(rounds.length,1)).toFixed(1);
+  const avgTricks1=(rounds.reduce((a,r)=>a+r.tricks[1],0)/Math.max(rounds.length,1)).toFixed(1);
+
+  // Trump suit frequency
+  const trumpFreq={};
+  rounds.forEach(r=>{if(r.trump){trumpFreq[r.trump]=(trumpFreq[r.trump]||0)+1}});
+  const topTrump=Object.entries(trumpFreq).sort((a,b)=>b[1]-a[1])[0];
+
+  // Shuffler stats
+  const shuffleMap={};
+  rounds.forEach(r=>{if(r.shuffler)shuffleMap[r.shuffler]=(shuffleMap[r.shuffler]||0)+1});
+  const shufflers=Object.entries(shuffleMap).sort((a,b)=>b[1]-a[1]);
+
+  const C0="#4a7cfc",C1="#e63946";
+  const pct=(a,b)=>Math.round((a/(a+b||1))*100);
+
+  return(
+    <div style={{padding:"48px 20px 60px",background:"#f9f9f9",minHeight:"100vh"}}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <h1 style={{...PT,marginBottom:2}}>{game.name||"Game Stats"}</h1>
+      <p style={{color:"#999",fontSize:13,marginBottom:20}}>{rounds.length} rounds · {days.length} sessions</p>
+
+      {/* Overall Score */}
+      <div style={{background:"white",borderRadius:20,padding:"18px 16px",marginBottom:14,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
+        <SectionTitle>🏆 Overall Score</SectionTitle>
+        <div style={{display:"flex",gap:10,marginTop:12}}>
+          {[0,1].map(i=>(
+            <div key={i} style={{flex:1,background:i===0?"#f0f5ff":"#fff0f0",borderRadius:14,padding:"14px 10px",textAlign:"center"}}>
+              <div style={{fontSize:11,color:i===0?C0:C1,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{t[i].name}</div>
+              <div style={{fontSize:42,fontWeight:900,color:i===0?C0:C1,lineHeight:1}}>{scores[i]}</div>
+              <div style={{fontSize:11,color:"#aaa",marginTop:4}}>{t[i].players.join(" & ")}</div>
+            </div>
+          ))}
+        </div>
+        {/* Win bar */}
+        <div style={{marginTop:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#888",marginBottom:4}}>
+            <span>{pct(scores[0],scores[1])}%</span><span>{pct(scores[1],scores[0])}%</span>
+          </div>
+          <div style={{height:8,borderRadius:8,background:"#f0f0f0",overflow:"hidden",display:"flex"}}>
+            <div style={{width:pct(scores[0],scores[1])+"%",background:C0,transition:"width 0.6s"}}/>
+            <div style={{width:pct(scores[1],scores[0])+"%",background:C1,transition:"width 0.6s"}}/>
+          </div>
+        </div>
+      </div>
+
+      {/* Day-wise results */}
+      <div style={{background:"white",borderRadius:20,padding:"18px 16px",marginBottom:14,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
+        <SectionTitle>📅 Session Winners</SectionTitle>
+        <p style={{fontSize:12,color:"#aaa",margin:"4px 0 12px"}}>Who won the day based on points scored that session</p>
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          <StatBox label={t[0].name+" days"} val={dayWins0} color={C0}/>
+          <StatBox label="Tied" val={dayTies} color="#888"/>
+          <StatBox label={t[1].name+" days"} val={dayWins1} color={C1}/>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:260,overflowY:"auto"}}>
+          {days.map((d,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:"#f9f9f9",borderRadius:12}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:d.winner===0?C0:d.winner===1?C1:"#ccc",flexShrink:0}}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#111"}}>{d.date}</div>
+                <div style={{fontSize:11,color:"#aaa"}}>{d.rounds} rounds{d.courts[0]+d.courts[1]>0?` · ${d.courts[0]+d.courts[1]} courts`:""}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:13,fontWeight:700,color:d.winner===0?C0:d.winner===1?C1:"#888"}}>
+                  {d.pts[0]} – {d.pts[1]}
+                </div>
+                <div style={{fontSize:10,color:"#bbb"}}>{d.winner===-1?"Tied":t[d.winner].name}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Courts */}
+      <div style={{background:"white",borderRadius:20,padding:"18px 16px",marginBottom:14,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
+        <SectionTitle>👑 Courts Won</SectionTitle>
+        <div style={{display:"flex",gap:8,marginTop:12}}>
+          <StatBox label={t[0].name} val={courts0} color={C0} sub={`+${courts0*6} bonus pts`}/>
+          <StatBox label={t[1].name} val={courts1} color={C1} sub={`+${courts1*6} bonus pts`}/>
+        </div>
+        {courts0+courts1>0&&(
+          <div style={{marginTop:12}}>
+            <div style={{height:8,borderRadius:8,background:"#f0f0f0",overflow:"hidden",display:"flex"}}>
+              <div style={{width:pct(courts0,courts1)+"%",background:C0}}/>
+              <div style={{width:pct(courts1,courts0)+"%",background:C1}}/>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Round wins */}
+      <div style={{background:"white",borderRadius:20,padding:"18px 16px",marginBottom:14,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
+        <SectionTitle>🃏 Round Wins</SectionTitle>
+        <div style={{display:"flex",gap:8,marginTop:12}}>
+          <StatBox label={t[0].name} val={wins0} color={C0} sub={pct(wins0,wins1)+"%"}/>
+          <StatBox label={t[1].name} val={wins1} color={C1} sub={pct(wins1,wins0)+"%"}/>
+        </div>
+        <div style={{marginTop:12}}>
+          <div style={{height:8,borderRadius:8,background:"#f0f0f0",overflow:"hidden",display:"flex"}}>
+            <div style={{width:pct(wins0,wins1)+"%",background:C0}}/>
+            <div style={{width:pct(wins1,wins0)+"%",background:C1}}/>
+          </div>
+        </div>
+      </div>
+
+      {/* Streaks */}
+      <div style={{background:"white",borderRadius:20,padding:"18px 16px",marginBottom:14,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
+        <SectionTitle>🔥 Streaks</SectionTitle>
+        <div style={{display:"flex",gap:8,marginTop:12}}>
+          <StatBox label={t[0].name+" best"} val={streak0} color={C0} sub="rounds"/>
+          <StatBox label={t[1].name+" best"} val={streak1} color={C1} sub="rounds"/>
+        </div>
+        {cs.count>1&&(
+          <div style={{marginTop:12,background:cs.team===0?"#f0f5ff":"#fff0f0",borderRadius:12,padding:"10px 14px",fontSize:13,fontWeight:600,color:cs.team===0?C0:C1,textAlign:"center"}}>
+            🔥 {t[cs.team].name} on a {cs.count}-round winning streak right now!
+          </div>
+        )}
+      </div>
+
+      {/* Avg tricks */}
+      <div style={{background:"white",borderRadius:20,padding:"18px 16px",marginBottom:14,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
+        <SectionTitle>🎯 Avg Tricks Per Round</SectionTitle>
+        <div style={{display:"flex",gap:8,marginTop:12}}>
+          <StatBox label={t[0].name} val={avgTricks0} color={C0}/>
+          <StatBox label={t[1].name} val={avgTricks1} color={C1}/>
+        </div>
+      </div>
+
+      {/* Best session day */}
+      <div style={{background:"white",borderRadius:20,padding:"18px 16px",marginBottom:14,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
+        <SectionTitle>📈 Best Session Score</SectionTitle>
+        <div style={{display:"flex",gap:8,marginTop:12}}>
+          <StatBox label={t[0].name} val={bestDay0} color={C0} sub="in one day"/>
+          <StatBox label={t[1].name} val={bestDay1} color={C1} sub="in one day"/>
+        </div>
+        {busiestDay.rounds>0&&(
+          <div style={{marginTop:12,fontSize:13,color:"#888",textAlign:"center"}}>
+            Busiest session: <strong style={{color:"#111"}}>{busiestDay.date}</strong> with {busiestDay.rounds} rounds
+          </div>
+        )}
+      </div>
+
+      {/* Trump stats */}
+      {topTrump&&(
+        <div style={{background:"white",borderRadius:20,padding:"18px 16px",marginBottom:14,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
+          <SectionTitle>🃏 Trump Suit Usage</SectionTitle>
+          <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
+            {["♠","♥","♦","♣"].map(s=>{
+              const cnt=trumpFreq[s]||0;
+              const red=s==="♥"||s==="♦";
+              return cnt>0?(
+                <div key={s} style={{flex:1,minWidth:60,background:"#f9f9f9",borderRadius:12,padding:"12px 8px",textAlign:"center"}}>
+                  <div style={{fontSize:24,color:red?"#e63946":"#1a1a2e"}}>{s}</div>
+                  <div style={{fontSize:18,fontWeight:800,color:"#111",marginTop:4}}>{cnt}</div>
+                  <div style={{fontSize:10,color:"#aaa"}}>rounds</div>
+                </div>
+              ):null;
+            })}
+          </div>
+          <div style={{marginTop:10,fontSize:13,color:"#888",textAlign:"center"}}>
+            Most used: <strong>{topTrump[0]}</strong> ({topTrump[1]} rounds)
+          </div>
+        </div>
+      )}
+
+      {/* Shuffler stats */}
+      {shufflers.length>0&&(
+        <div style={{background:"white",borderRadius:20,padding:"18px 16px",marginBottom:14,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
+          <SectionTitle>🎲 Shuffler Leaderboard</SectionTitle>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
+            {shufflers.map(([name,cnt],i)=>(
+              <div key={name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:"#f9f9f9",borderRadius:12}}>
+                <div style={{width:28,height:28,borderRadius:"50%",background:i===0?"#fff3cd":i===1?"#f0f0f0":i===2?"#fff0e8":"#f9f9f9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:i===0?"#856404":i===1?"#555":i===2?"#c2410c":"#888",flexShrink:0}}>
+                  {i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}
+                </div>
+                <div style={{flex:1,fontSize:14,fontWeight:600,color:"#111"}}>{name}</div>
+                <div style={{fontSize:14,fontWeight:700,color:"#555"}}>{cnt} <span style={{fontSize:11,color:"#aaa"}}>rounds</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SectionTitle({children}){return<div style={{fontSize:13,fontWeight:700,color:"#888",textTransform:"uppercase",letterSpacing:0.8}}>{children}</div>}
+function StatBox({label,val,color,sub}){
+  return(
+    <div style={{flex:1,background:"#f9f9f9",borderRadius:14,padding:"14px 10px",textAlign:"center"}}>
+      <div style={{fontSize:11,color:"#aaa",fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:0.5}}>{label}</div>
+      <div style={{fontSize:32,fontWeight:900,color:color||"#111",lineHeight:1}}>{val}</div>
+      {sub&&<div style={{fontSize:11,color:"#aaa",marginTop:4}}>{sub}</div>}
     </div>
   );
 }
