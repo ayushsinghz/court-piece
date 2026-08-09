@@ -118,7 +118,7 @@ function App(){
       {screen==="history"&&game&&<History game={game} scores={scores} onBack={()=>setScreen("game")} onShare={()=>setScreen("share")} lang={lang}/>}
       {screen==="share"&&game&&<Share game={game} scores={scores} onBack={()=>setScreen("game")} showToast={showToast} lang={lang}/>}
       {screen==="import"&&<Import onBack={()=>setScreen("home")} onImport={imp=>{setGames(ex=>{const ids=new Set(ex.map(g=>g.id));return[...ex,...imp.filter(g=>!ids.has(g.id))]});showToast("Imported!");setScreen("home")}}/>}
-      {screen==="dashboard"&&game&&<Dashboard game={game} scores={scores} onBack={()=>setScreen(load("cp:dashback")||"game")}/>}
+      {screen==="dashboard"&&game&&<Dashboard game={game} scores={scores} onBack={()=>setScreen(load("cp:dashback")||"game")} showToast={showToast}/>}
       <Toast msg={toast}/>
     </div>
   );
@@ -406,7 +406,157 @@ function Share({game,scores,onBack,showToast,lang}){
 }
 
 
-function Dashboard({game,scores,onBack}){
+function Dashboard({game,scores,onBack,showToast}){
+  const canvasRef=React.useRef(null);
+  const[sharing,setSharing]=useState(false);
+
+  const shareAsImage=()=>{
+    setSharing(true);
+    const t=game.teams;
+    const rounds=game.rounds;
+    const C0="#4a7cfc",C1="#e63946",BG="#f9f9f9",WHITE="#ffffff",DARK="#111111",GREY="#888888",LGREY="#eeeeee";
+    const W=540,PAD=24;
+
+    // Compute stats
+    const courts0=rounds.filter(r=>r.court&&r.court[0]).length;
+    const courts1=rounds.filter(r=>r.court&&r.court[1]).length;
+    const wins0=rounds.filter(r=>r.won[0]).length;
+    const wins1=rounds.filter(r=>r.won[1]).length;
+    const dayMap={};
+    rounds.forEach(r=>{
+      if(!r.ts)return;
+      const d=new Date(r.ts).toLocaleDateString(undefined,{day:"numeric",month:"short"});
+      if(!dayMap[d])dayMap[d]={pts:[0,0]};
+      if(r.won[0])dayMap[d].pts[0]+=1+(r.court&&r.court[0]?6:0);
+      if(r.won[1])dayMap[d].pts[1]+=1+(r.court&&r.court[1]?6:0);
+    });
+    const days=Object.values(dayMap);
+    const dayWins0=days.filter(d=>d.pts[0]>d.pts[1]).length;
+    const dayWins1=days.filter(d=>d.pts[1]>d.pts[0]).length;
+    function longestStreak(ti){let max=0,cur=0;rounds.forEach(r=>{if(r.won[ti]){cur++;max=Math.max(max,cur)}else cur=0});return max;}
+    const streak0=longestStreak(0),streak1=longestStreak(1);
+    const avg0=(rounds.reduce((a,r)=>a+r.tricks[0],0)/Math.max(rounds.length,1)).toFixed(1);
+    const avg1=(rounds.reduce((a,r)=>a+r.tricks[1],0)/Math.max(rounds.length,1)).toFixed(1);
+
+    // Layout rows
+    const rows=[
+      {type:"header"},
+      {type:"scores"},
+      {type:"bar",v0:scores[0],v1:scores[1],label:"Overall Points"},
+      {type:"spacer"},
+      {type:"row4",label:"Sessions Won",v0:dayWins0,v1:dayWins1,c0:C0,c1:C1},
+      {type:"row4",label:"Rounds Won",v0:wins0,v1:wins1,c0:C0,c1:C1},
+      {type:"row4",label:"Courts Won 👑",v0:courts0,v1:courts1,c0:C0,c1:C1},
+      {type:"row4",label:"Best Streak 🔥",v0:streak0,v1:streak1,c0:C0,c1:C1},
+      {type:"row4",label:"Avg Tricks",v0:avg0,v1:avg1,c0:C0,c1:C1},
+      {type:"spacer"},
+      {type:"footer"},
+    ];
+
+    // Measure height
+    const rowH={header:80,scores:90,bar:36,spacer:12,row4:44,footer:36};
+    const H=rows.reduce((a,r)=>a+rowH[r.type],0)+PAD*2;
+
+    const canvas=document.createElement("canvas");
+    canvas.width=W*2;canvas.height=H*2; // 2x for retina
+    const ctx=canvas.getContext("2d");
+    ctx.scale(2,2);
+
+    // Background
+    ctx.fillStyle=BG;ctx.fillRect(0,0,W,H);
+
+    let y=PAD;
+    const cx=W/2;
+
+    rows.forEach(row=>{
+      if(row.type==="header"){
+        // Card emoji + title
+        ctx.fillStyle=DARK;ctx.font="bold 20px -apple-system,system-ui,sans-serif";
+        ctx.textAlign="center";
+        ctx.fillText("🃏 "+(game.name||"Court Piece")+" — Stats",cx,y+22);
+        ctx.fillStyle=GREY;ctx.font="13px -apple-system,system-ui,sans-serif";
+        ctx.fillText(rounds.length+" rounds · "+days.length+" sessions · "+new Date().toLocaleDateString(),cx,y+46);
+        y+=rowH.header;
+      }
+      else if(row.type==="scores"){
+        const bw=(W-PAD*2-10)/2;
+        [[0,C0],[1,C1]].forEach(([i,c])=>{
+          const bx=PAD+(i*(bw+10));
+          // Card bg
+          ctx.fillStyle=WHITE;roundRect(ctx,bx,y,bw,80,14);ctx.fill();
+          // Team name
+          ctx.fillStyle=c;ctx.font="bold 11px -apple-system,system-ui,sans-serif";
+          ctx.textAlign="center";ctx.fillText(t[i].name.toUpperCase(),bx+bw/2,y+20);
+          // Score
+          ctx.fillStyle=DARK;ctx.font="bold 38px -apple-system,system-ui,sans-serif";
+          ctx.fillText(String(scores[i]),bx+bw/2,y+62);
+        });
+        y+=rowH.scores;
+      }
+      else if(row.type==="bar"){
+        const total=row.v0+row.v1||1;
+        const bw=W-PAD*2;
+        const bx=PAD;
+        ctx.fillStyle=LGREY;roundRect(ctx,bx,y+10,bw,16,8);ctx.fill();
+        const w0=Math.round(bw*(row.v0/total));
+        ctx.fillStyle=C0;roundRect(ctx,bx,y+10,w0,16,8);ctx.fill();
+        ctx.fillStyle=GREY;ctx.font="11px -apple-system,system-ui,sans-serif";
+        ctx.textAlign="left";ctx.fillText(Math.round(row.v0/total*100)+"%",bx,y+8);
+        ctx.textAlign="right";ctx.fillText(Math.round(row.v1/total*100)+"%",bx+bw,y+8);
+        y+=rowH.bar;
+      }
+      else if(row.type==="spacer"){y+=rowH.spacer;}
+      else if(row.type==="row4"){
+        // Label + two value boxes
+        const bw=(W-PAD*2-10)/2;
+        ctx.fillStyle=WHITE;roundRect(ctx,PAD,y,W-PAD*2,38,10);ctx.fill();
+        ctx.fillStyle=GREY;ctx.font="12px -apple-system,system-ui,sans-serif";
+        ctx.textAlign="left";ctx.fillText(row.label,PAD+12,y+24);
+        // Values
+        [[row.v0,row.c0],[row.v1,row.c1]].forEach(([v,c],i)=>{
+          ctx.fillStyle=c;ctx.font="bold 15px -apple-system,system-ui,sans-serif";
+          ctx.textAlign=i===0?"center":"center";
+          const vx=i===0?W-PAD-90:W-PAD-30;
+          ctx.fillText(String(v),vx,y+24);
+        });
+        // Team mini labels
+        ctx.fillStyle="#bbb";ctx.font="9px -apple-system,system-ui,sans-serif";
+        ctx.textAlign="center";
+        ctx.fillText(t[0].name,W-PAD-90,y+36);
+        ctx.fillText(t[1].name,W-PAD-30,y+36);
+        y+=rowH.row4;
+      }
+      else if(row.type==="footer"){
+        ctx.fillStyle=GREY;ctx.font="11px -apple-system,system-ui,sans-serif";
+        ctx.textAlign="center";ctx.fillText("Scored with Court Piece app",cx,y+20);
+        y+=rowH.footer;
+      }
+    });
+
+    // Helper
+    function roundRect(ctx,x,y,w,h,r){
+      ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
+      ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);
+      ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
+      ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);
+      ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+    }
+
+    // Export as low-quality JPEG for small size
+    canvas.toBlob(blob=>{
+      setSharing(false);
+      if(!blob){showToast("Could not generate image");return;}
+      const url=URL.createObjectURL(blob);
+      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([blob],"courtpiece-stats.jpg",{type:"image/jpeg"})]})){
+        navigator.share({files:[new File([blob],"courtpiece-stats.jpg",{type:"image/jpeg"})],title:"Court Piece Stats"}).catch(()=>{});
+      } else {
+        const a=document.createElement("a");a.href=url;a.download="courtpiece-stats.jpg";a.click();
+        showToast("Image downloaded!");
+      }
+      setTimeout(()=>URL.revokeObjectURL(url),5000);
+    },"image/jpeg",0.82);
+  };
+
   const t=game.teams;
   const rounds=game.rounds;
 
@@ -649,6 +799,16 @@ function Dashboard({game,scores,onBack}){
           </div>
         </div>
       )}
+      {/* Share as Image button */}
+      <div style={{position:"sticky",bottom:16,marginTop:8}}>
+        <button onClick={shareAsImage} disabled={sharing}
+          style={{width:"100%",padding:15,borderRadius:16,fontSize:16,fontWeight:700,
+            background:sharing?"#f0f0f0":"#111",color:sharing?"#bbb":"white",
+            border:"none",cursor:sharing?"not-allowed":"pointer",
+            boxShadow:"0 4px 16px rgba(0,0,0,0.15)"}}>
+          {sharing?"⏳ Generating…":"📸 Share Stats as Image"}
+        </button>
+      </div>
     </div>
   );
 }
