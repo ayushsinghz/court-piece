@@ -178,9 +178,17 @@ function App(){
   const ttfScores=game&&game.type==="ttf"?calcTTFScores(game.rounds):[0,0,0];
 
   const upd=useCallback(p=>setGames(gs=>gs.map(g=>g.id===activeId?{...g,...p,updatedAt:new Date().toISOString()}:g)),[activeId,setGames]);
-  const goCPGame=id=>{setActiveId(id);setCPRound(newCPRound());setScreen("cp:game")};
-  const goTTFGame=id=>{setActiveId(id);setTTFRound(newTTFRound());setScreen("ttf:game")};
-  const goGame=g=>{if(g.type==="cp")goCPGame(g.id);else goTTFGame(g.id)};
+
+  const goGame=g=>{
+    setActiveId(g.id);
+    if(g.type==="cp"){setCPRound(newCPRound());setScreen("cp:game");}
+    else if(g.type==="ttf"){setTTFRound(newTTFRound());setScreen("ttf:game");}
+    else if(g.type==="uno")setScreen("uno:game");
+    else if(g.type==="g28")setScreen("g28:game");
+    else if(g.type==="tp")setScreen("tp:game");
+    else if(g.type==="poker")setScreen("poker:game");
+    else if(g.type==="rummy")setScreen("rummy:game");
+  };
   const del=id=>{setGames(gs=>gs.filter(g=>g.id!==id));if(activeId===id){setActiveId(null);setScreen("home")}};
   const exp=()=>{
     const d=JSON.stringify(games,null,2);
@@ -189,12 +197,20 @@ function App(){
     showToast("Copied! Paste in Import.");
   };
 
+  const submitAndBack=(patch,backScreen)=>{upd(patch);showToast("Saved!");setScreen(backScreen);};
+
+  // Generic submit for UNO/Rummy/Chip games
+  const genericSubmit=(nr)=>{upd({rounds:[...game.rounds,nr]});};
+
   return(
     <div style={{minHeight:"100vh",background:"white"}}>
-      {screen==="home"&&<HomeScreen games={games} activeId={activeId} onNew={t=>setScreen(t==="cp"?"cp:setup":"ttf:setup")} onSelect={goGame} onDelete={del} onExport={exp} onImport={()=>setScreen("import")} onDashboard={(id,type)=>{setActiveId(id);save("cg:dashback","home");setScreen(type+":dash")}}/>}
+      {screen==="home"&&<HomeScreen games={games} activeId={activeId}
+        onNew={t=>setScreen(t+":setup")} onSelect={goGame} onDelete={del}
+        onExport={exp} onImport={()=>setScreen("import")}
+        onDashboard={(id,type)=>{setActiveId(id);save("cg:dashback","home");setScreen(type+":dash")}}/>}
 
-      {/* Court Piece screens */}
-      {screen==="cp:setup"&&<CPSetup onBack={()=>setScreen("home")} onStart={g=>{setGames(gs=>[...gs,g]);goCPGame(g.id)}}/>}
+      {/* ── Court Piece ── */}
+      {screen==="cp:setup"&&<CPSetup onBack={()=>setScreen("home")} onStart={g=>{setGames(gs=>[...gs,g]);setActiveId(g.id);setCPRound(newCPRound());setScreen("cp:game")}}/>}
       {screen==="cp:game"&&game&&game.type==="cp"&&<CPGame game={game} scores={cpScores} round={cpRound} setRound={setCPRound}
         onSubmit={nr=>{upd({rounds:[...game.rounds,nr]});setCPRound(newCPRound());
           const isC=nr.court[0]||nr.court[1],cW=nr.court[0]?game.teams[0].name:game.teams[1].name,cL=nr.court[0]?game.teams[1].name:game.teams[0].name;
@@ -203,38 +219,225 @@ function App(){
         }}
         onEditTeams={()=>setScreen("cp:editTeams")} onHistory={()=>setScreen("cp:history")}
         onShare={()=>setScreen("cp:share")} onDash={()=>{save("cg:dashback","cp:game");setScreen("cp:dash")}}
-        onEnd={()=>{upd({finished:true});setScreen("home");showToast("Game saved!")}}
+        onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
         onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang} setScreen={setScreen}/>}
       {screen==="cp:editTeams"&&game&&<CPEditTeams teams={game.teams} onBack={()=>setScreen("cp:game")} onSave={t=>{upd({teams:t});setScreen("cp:game");showToast("Teams updated!")}}/>}
       {screen==="cp:history"&&game&&<CPHistory game={game} scores={cpScores} onBack={()=>setScreen("cp:game")} onShare={()=>setScreen("cp:share")} lang={lang}/>}
       {screen==="cp:share"&&game&&<CPShare game={game} scores={cpScores} onBack={()=>setScreen("cp:game")} showToast={showToast} lang={lang}/>}
       {screen==="cp:dash"&&game&&<CPDashboard game={game} scores={cpScores} onBack={()=>setScreen(load("cg:dashback")||"cp:game")} showToast={showToast}/>}
 
-      {/* 3-2-5 screens */}
-      {screen==="ttf:setup"&&<TTFSetup onBack={()=>setScreen("home")} onStart={g=>{setGames(gs=>[...gs,g]);goTTFGame(g.id)}}/>}
+      {/* ── 3-2-5 ── */}
+      {screen==="ttf:setup"&&<TTFSetup onBack={()=>setScreen("home")} onStart={g=>{setGames(gs=>[...gs,g]);setActiveId(g.id);setTTFRound(newTTFRound());setScreen("ttf:game")}}/>}
       {screen==="ttf:game"&&game&&game.type==="ttf"&&<TTFGame game={game} scores={ttfScores} round={ttfRound} setRound={setTTFRound}
-        onSubmit={nr=>{
-          upd({rounds:[...game.rounds,nr]});
-          setTTFRound(newTTFRound());
-          showToast("Round "+(game.rounds.length+1)+" recorded!");
-        }}
-        onHistory={()=>setScreen("ttf:history")} onShare={()=>setScreen("ttf:share")} onDash={()=>{save("cg:dashback","ttf:game");setScreen("ttf:dash")}}
-        onEnd={()=>{upd({finished:true});setScreen("home");showToast("Game saved!")}}
+        onSubmit={nr=>{upd({rounds:[...game.rounds,nr]});setTTFRound(newTTFRound());showToast("Round "+(game.rounds.length+1)+" recorded!");}}
+        onHistory={()=>setScreen("ttf:history")} onShare={()=>setScreen("ttf:share")}
+        onDash={()=>{save("cg:dashback","ttf:game");setScreen("ttf:dash")}}
+        onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
         onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang} onEditPlayers={()=>setScreen("ttf:editPlayers")}/>}
-      {screen==="ttf:editPlayers"&&game&&<TTFEditPlayers players={game.players} onBack={()=>setScreen("ttf:game")} onSave={p=>{upd({players:p});setScreen("ttf:game");showToast("Players updated!")}}/>}
+      {screen==="ttf:editPlayers"&&game&&<TTFEditPlayers players={game.players} onBack={()=>setScreen("ttf:game")} onSave={p=>{upd({players:p});setScreen("ttf:game");showToast("Updated!")}}/>}
       {screen==="ttf:history"&&game&&<TTFHistory game={game} scores={ttfScores} onBack={()=>setScreen("ttf:game")} onShare={()=>setScreen("ttf:share")} lang={lang}/>}
       {screen==="ttf:share"&&game&&<TTFShare game={game} scores={ttfScores} onBack={()=>setScreen("ttf:game")} showToast={showToast} lang={lang}/>}
       {screen==="ttf:dash"&&game&&<TTFDashboard game={game} scores={ttfScores} onBack={()=>setScreen(load("cg:dashback")||"ttf:game")} showToast={showToast}/>}
+
+      {/* ── UNO ── */}
+      {screen==="uno:setup"&&<UNOSetup onBack={()=>setScreen("home")} onStart={g=>{setGames(gs=>[...gs,g]);setActiveId(g.id);setScreen("uno:game")}}/>}
+      {screen==="uno:game"&&game&&game.type==="uno"&&<UNOGame game={game}
+        onSubmit={nr=>{upd({rounds:[...game.rounds,nr]});showToast("Round "+(game.rounds.length+1)+" recorded!");}}
+        onHistory={()=>setScreen("uno:history")} onShare={()=>setScreen("uno:share")}
+        onRules={()=>setScreen("uno:rules")}
+        onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
+        onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang}/>}
+      {screen==="uno:history"&&game&&<UNOHistory game={game} onBack={()=>setScreen("uno:game")} onShare={()=>setScreen("uno:share")}/>}
+      {screen==="uno:rules"&&<UNORules onBack={()=>setScreen("uno:game")}/>}
+      {screen==="uno:share"&&game&&<GenericShare game={game} scores={calcUNOScores(game.rounds)} onBack={()=>setScreen("uno:game")} showToast={showToast} label="UNO" color="#e63946"/>}
+
+      {/* ── 28 ── */}
+      {screen==="g28:setup"&&<G28Setup onBack={()=>setScreen("home")} onStart={g=>{setGames(gs=>[...gs,g]);setActiveId(g.id);setScreen("g28:game")}}/>}
+      {screen==="g28:game"&&game&&game.type==="g28"&&<G28Game game={game}
+        onSubmit={nr=>{upd({rounds:[...game.rounds,nr]});showToast("Round "+(game.rounds.length+1)+" recorded!");}}
+        onHistory={()=>setScreen("g28:history")} onRules={()=>setScreen("g28:rules")}
+        onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
+        onHome={()=>setScreen("home")} showToast={showToast}/>}
+      {screen==="g28:history"&&game&&<G28History game={game} onBack={()=>setScreen("g28:game")}/>}
+      {screen==="g28:rules"&&<G28Rules onBack={()=>setScreen("g28:game")}/>}
+
+      {/* ── Teen Patti ── */}
+      {screen==="tp:setup"&&<ChipGameSetup onBack={()=>setScreen("home")} gameType="tp" color="#9b5de5" label="TEEN PATTI" minPlayers={3} maxPlayers={6}
+        onStart={g=>{setGames(gs=>[...gs,g]);setActiveId(g.id);setScreen("tp:game")}}/>}
+      {screen==="tp:game"&&game&&game.type==="tp"&&<ChipGame game={game} color="#9b5de5" label="TEEN PATTI"
+        onSubmit={nr=>{upd({rounds:[...game.rounds,nr]});showToast("Round "+(game.rounds.length+1)+" recorded!");}}
+        onHistory={()=>setScreen("tp:history")} onRules={()=>setScreen("tp:rules")}
+        onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
+        onHome={()=>setScreen("home")} showToast={showToast}/>}
+      {screen==="tp:history"&&game&&<ChipHistory game={game} onBack={()=>setScreen("tp:game")} color="#9b5de5" label="TEEN PATTI"/>}
+      {screen==="tp:rules"&&<TeenPattiRules onBack={()=>setScreen("tp:game")}/>}
+
+      {/* ── Poker ── */}
+      {screen==="poker:setup"&&<ChipGameSetup onBack={()=>setScreen("home")} gameType="poker" color="#2a9d8f" label="POKER" minPlayers={2} maxPlayers={10}
+        onStart={g=>{setGames(gs=>[...gs,g]);setActiveId(g.id);setScreen("poker:game")}}/>}
+      {screen==="poker:game"&&game&&game.type==="poker"&&<ChipGame game={game} color="#2a9d8f" label="POKER"
+        onSubmit={nr=>{upd({rounds:[...game.rounds,nr]});showToast("Round "+(game.rounds.length+1)+" recorded!");}}
+        onHistory={()=>setScreen("poker:history")} onRules={()=>setScreen("poker:rules")}
+        onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
+        onHome={()=>setScreen("home")} showToast={showToast}/>}
+      {screen==="poker:history"&&game&&<ChipHistory game={game} onBack={()=>setScreen("poker:game")} color="#2a9d8f" label="POKER"/>}
+      {screen==="poker:rules"&&<PokerRules onBack={()=>setScreen("poker:game")}/>}
+
+      {/* ── Rummy ── */}
+      {screen==="rummy:setup"&&<RummySetup onBack={()=>setScreen("home")} onStart={g=>{setGames(gs=>[...gs,g]);setActiveId(g.id);setScreen("rummy:game")}}/>}
+      {screen==="rummy:game"&&game&&game.type==="rummy"&&<RummyGame game={game}
+        onSubmit={nr=>{upd({rounds:[...game.rounds,nr]});showToast("Round "+(game.rounds.length+1)+" recorded!");}}
+        onHistory={()=>setScreen("rummy:history")} onRules={()=>setScreen("rummy:rules")}
+        onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
+        onHome={()=>setScreen("home")} showToast={showToast}/>}
+      {screen==="rummy:history"&&game&&<RummyHistory game={game} onBack={()=>setScreen("rummy:game")}/>}
+      {screen==="rummy:rules"&&<RummyRules onBack={()=>setScreen("rummy:game")}/>}
 
       {screen==="import"&&<Import onBack={()=>setScreen("home")} onImport={imp=>{setGames(ex=>{const ids=new Set(ex.map(g=>g.id));return[...ex,...imp.filter(g=>!ids.has(g.id))]});showToast("Imported!");setScreen("home")}}/>}
       <Toast msg={toast}/>
     </div>
   );
 }
+// ── Generic Share screen (for UNO etc.) ───────────────────────────────────────
+function GenericShare({game,scores,onBack,showToast,label,color}){
+  const p=game.players||game.teams?.map(t=>t.name)||[];
+  const scoreLines=Array.isArray(scores)?scores.map((s,i)=>p[i]+": "+s).join("  |  "):"";
+  const text=["🃏 "+label+(game.name?" — "+game.name:""),"━━━━━━━━━━━━━━━━━━━━━━","SCORE  "+scoreLines,"","Updated: "+fmt(game.updatedAt),"Scored with Card Games app"].join("\n");
+  const wa="https://wa.me/?text="+encodeURIComponent(text);
+  const copy=()=>{const fb=()=>{const el=document.createElement("textarea");el.value=text;el.style.cssText="position:fixed;opacity:0";document.body.appendChild(el);el.focus();el.select();try{document.execCommand("copy")}catch{}document.body.removeChild(el);showToast("Copied!")};navigator.clipboard?.writeText(text).then(()=>showToast("Copied!")).catch(fb)||fb()};
+  return(
+    <div style={{padding:"48px 20px 40px"}}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <h1 style={PT}>Share Score</h1>
+      <div style={{background:"#f7f7f7",borderRadius:15,padding:15,fontFamily:"monospace",fontSize:12,lineHeight:1.8,color:"#333",whiteSpace:"pre-wrap",marginBottom:14,marginTop:16}}>{text}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:9}}>
+        <a href={wa} target="_blank" rel="noopener noreferrer" style={{display:"block",padding:15,borderRadius:16,fontSize:16,fontWeight:700,textAlign:"center",textDecoration:"none",background:"#25D366",color:"white"}}>💬 WhatsApp</a>
+        <button onClick={copy} style={{width:"100%",padding:15,borderRadius:16,fontSize:16,fontWeight:700,background:"#f2f2f2",color:"#333",border:"none",cursor:"pointer"}}>📋 Copy</button>
+      </div>
+    </div>
+  );
+}
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ── HOME SCREEN ───────────────────────────────────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════════
+// ── Home Screen ───────────────────────────────────────────────────────────────
+const GAME_META={
+  cp:{label:"Court Piece",short:"CP",color:"#4a7cfc",bg:"#f0f5ff"},
+  ttf:{label:"3-2-5",short:"3-2-5",color:"#16a34a",bg:"#f0fff4"},
+  uno:{label:"UNO",short:"UNO",color:"#e63946",bg:"#fff0f0"},
+  g28:{label:"28",short:"28",color:"#f4a261",bg:"#fff7f0"},
+  tp:{label:"Teen Patti",short:"TP",color:"#9b5de5",bg:"#f5f0ff"},
+  poker:{label:"Poker",short:"♠",color:"#2a9d8f",bg:"#f0fdfa"},
+  rummy:{label:"Rummy",short:"RU",color:"#f15bb5",bg:"#fff0f8"},
+};
+
+const GAME_TYPES=[
+  {type:"cp",label:"🃏 Court Piece",color:"#4a7cfc",desc:"2 teams · trick taking"},
+  {type:"ttf",label:"🎴 3-2-5",color:"#16a34a",desc:"3 players · bid & win"},
+  {type:"uno",label:"🟥 UNO",color:"#e63946",desc:"2-10 players · card shedding"},
+  {type:"g28",label:"2️⃣8️⃣ 28",color:"#f4a261",desc:"2 teams · trick & bid"},
+  {type:"tp",label:"🪙 Teen Patti",color:"#9b5de5",desc:"3-6 players · chip betting"},
+  {type:"poker",label:"♠️ Poker",color:"#2a9d8f",desc:"2-10 players · chip betting"},
+  {type:"rummy",label:"🃏 Rummy",color:"#f15bb5",desc:"2-6 players · 13 cards"},
+];
+
+function getGameScore(g){
+  if(g.type==="cp")return calcCPScores(g.rounds).join(" – ");
+  if(g.type==="ttf")return calcTTFScores(g.rounds).map((s,i)=>(s>=0?"+":"")+s).join(" | ");
+  if(g.type==="uno")return calcUNOScores(g.rounds).join(" – ");
+  if(g.type==="g28")return calc28Scores(g.rounds).join(" – ");
+  if(g.type==="tp"||g.type==="poker"){const p=g.players;return p.map((_,i)=>g.chipStart+g.rounds.reduce((a,r)=>a+(r.deltas?.[i]||0),0)).join(" | ");}
+  if(g.type==="rummy")return g.players.map((_,i)=>g.rounds.reduce((a,r)=>a+(r.scores?.[i]||0),0)).join(" – ");
+  return "—";
+}
+
+function getGameSub(g){
+  if(g.type==="cp")return g.teams[0].name+" vs "+g.teams[1].name;
+  if(g.type==="ttf")return g.players.join(" · ");
+  return (g.players||g.teams?.map(t=>t.name)||[]).join(" · ");
+}
+
+function HomeScreen({games,activeId,onNew,onSelect,onDelete,onExport,onImport,onDashboard}){
+  const[conf,setConf]=useState(null);
+  const[newMenu,setNewMenu]=useState(false);
+  return(
+    <div style={{padding:"52px 20px 40px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+        <span style={{fontSize:28}}>🃏</span>
+        <h1 style={{margin:0,fontSize:30,fontWeight:800,color:"#111",letterSpacing:-1}}>Card Games</h1>
+      </div>
+      <p style={{margin:"0 0 18px",color:"#888",fontSize:14}}>7 games · scores saved automatically</p>
+
+      {!newMenu&&<button onClick={()=>setNewMenu(true)} style={{width:"100%",padding:15,borderRadius:16,fontSize:16,fontWeight:700,background:"#111",color:"white",border:"none",cursor:"pointer"}}>+ New Game</button>}
+      {newMenu&&(
+        <div style={{background:"#f7f7f7",borderRadius:18,padding:"14px 12px",marginBottom:4}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#888",textTransform:"uppercase",letterSpacing:0.8,marginBottom:10}}>Choose Game</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {GAME_TYPES.map(({type,label,color,desc})=>(
+              <button key={type} onClick={()=>{setNewMenu(false);onNew(type)}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:13,background:"white",border:"2px solid #f0f0f0",cursor:"pointer",textAlign:"left"}}>
+                <div style={{width:10,height:10,borderRadius:"50%",background:color,flexShrink:0}}/>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:700,color:"#111"}}>{label}</div>
+                  <div style={{fontSize:11,color:"#aaa"}}>{desc}</div>
+                </div>
+                <div style={{fontSize:16,color:"#ccc"}}>→</div>
+              </button>
+            ))}
+          </div>
+          <button onClick={()=>setNewMenu(false)} style={{width:"100%",background:"none",border:"none",color:"#aaa",fontSize:14,cursor:"pointer",marginTop:10,padding:"6px 0"}}>Cancel</button>
+        </div>
+      )}
+
+      <div style={{height:10}}/>
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={onExport} style={{flex:1,background:"#f7f7f7",border:"1.5px solid #e8e8e8",borderRadius:14,padding:11,fontSize:13,fontWeight:700,color:"#555",cursor:"pointer"}}>📤 Export</button>
+        <button onClick={onImport} style={{flex:1,background:"#f7f7f7",border:"1.5px solid #e8e8e8",borderRadius:14,padding:11,fontSize:13,fontWeight:700,color:"#555",cursor:"pointer"}}>📥 Import</button>
+      </div>
+
+      {games.length>0&&(
+        <div style={{marginTop:22}}>
+          <Lbl>Saved Games ({games.length})</Lbl>
+          <div style={{display:"flex",flexDirection:"column",gap:9,marginTop:8}}>
+            {[...games].reverse().map(g=>{
+              const meta=GAME_META[g.type]||{label:g.type,short:"?",color:"#888",bg:"#f7f7f7"};
+              const isA=activeId===g.id;
+              return(
+                <div key={g.id}>
+                  <div style={{display:"flex",gap:7}}>
+                    <div onClick={()=>onSelect(g)} style={{flex:1,background:isA?meta.bg:"#f7f7f7",border:isA?"2px solid "+meta.color:"2px solid transparent",borderRadius:15,padding:"12px 14px",cursor:"pointer"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                        <div style={{flex:1}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                            <span style={{fontSize:9,fontWeight:700,color:"white",background:meta.color,borderRadius:5,padding:"2px 6px"}}>{meta.short}</span>
+                            <span style={{fontWeight:700,fontSize:14,color:"#111"}}>{g.name||"Unnamed Game"}</span>
+                          </div>
+                          <div style={{fontSize:11,color:"#888"}}>{getGameSub(g)} · {g.rounds.length} rounds</div>
+                          <div style={{fontSize:10,color:"#bbb",marginTop:2}}>{g.updatedAt?"Saved "+fmt(g.updatedAt):fmt(g.createdAt)}</div>
+                        </div>
+                        <div style={{textAlign:"right",marginLeft:8}}>
+                          <div style={{fontWeight:800,fontSize:15,color:"#111"}}>{getGameScore(g)}</div>
+                          <div style={{fontSize:9,fontWeight:700,marginTop:2,color:g.finished?"#4a7cfc":"#22c55e"}}>{g.finished?"DONE":"ACTIVE"}</div>
+                        </div>
+                      </div>
+                    </div>
+                    {(g.type==="cp"||g.type==="ttf")&&<button onClick={e=>{e.stopPropagation();onDashboard(g.id,g.type)}} style={{width:40,background:"#f0f5ff",border:"none",borderRadius:13,cursor:"pointer",fontSize:15,color:"#4a7cfc"}}>📊</button>}
+                    <button onClick={()=>setConf(g.id)} style={{width:40,background:"#fff0f0",border:"none",borderRadius:13,cursor:"pointer",fontSize:15,color:"#e63946"}}>🗑</button>
+                  </div>
+                  {conf===g.id&&(
+                    <div style={{background:"#fff0f0",border:"1.5px solid #fca5a5",borderRadius:11,padding:"9px 13px",marginTop:5,display:"flex",alignItems:"center",gap:9}}>
+                      <span style={{fontSize:13,color:"#b91c1c",flex:1}}>Delete this game?</span>
+                      <button onClick={()=>{onDelete(g.id);setConf(null)}} style={{background:"#e63946",border:"none",color:"white",borderRadius:8,padding:"5px 11px",fontWeight:700,fontSize:12,cursor:"pointer"}}>Delete</button>
+                      <button onClick={()=>setConf(null)} style={{background:"#f2f2f2",border:"none",borderRadius:8,padding:"5px 11px",fontWeight:600,fontSize:12,cursor:"pointer"}}>Cancel</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {games.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"#ccc",fontSize:14}}>No saved games yet.<br/>Tap + New Game to start!</div>}
+    </div>
+  );
+}
 function HomeScreen({games,activeId,onNew,onSelect,onDelete,onExport,onImport,onDashboard}){
   const[conf,setConf]=useState(null);
   const[newMenu,setNewMenu]=useState(false);
@@ -1009,6 +1212,876 @@ function TTFDashboard({game,scores,onBack,showToast}){
 // ══════════════════════════════════════════════════════════════════════════════
 // ── IMPORT ────────────────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── UNO ───────────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+const UNO_CARD_POINTS = {
+  "0-9": "face value",
+  "Skip/Reverse/Draw 2": 20,
+  "Wild/Wild Draw 4": 50
+};
+
+const newUNOGame = () => ({
+  id: Date.now(), type: "uno", name: "",
+  players: ["", "", ""],
+  rounds: [],
+  targetScore: 500,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  finished: false
+});
+
+const calcUNOScores = rounds =>
+  rounds.reduce((acc, r) => {
+    if (!r.scores) return acc;
+    return acc.map((v, i) => v + (r.scores[i] || 0));
+  }, rounds.length > 0 ? new Array(rounds[0].scores?.length || 0).fill(0) : []);
+
+function UNOSetup({ onBack, onStart }) {
+  const [d, setD] = useState(() => newUNOGame());
+  const [numPlayers, setNumPlayers] = useState(3);
+  const setP = (i, v) => setD(g => { const p = [...g.players]; p[i] = v; return { ...g, players: p }; });
+  const ok = d.players.slice(0, numPlayers).every(p => p.trim());
+  const adjustPlayers = n => {
+    setNumPlayers(n);
+    setD(g => {
+      const p = [...g.players];
+      while (p.length < n) p.push("");
+      return { ...g, players: p.slice(0, n) };
+    });
+  };
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: "#e63946", borderRadius: 8, padding: "3px 10px" }}>UNO</span>
+        <h1 style={PT}>New Game</h1>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Card><Lbl>Game Name <M>(optional)</M></Lbl><Inp value={d.name} placeholder="e.g. Family Night" onChange={v => setD(g => ({ ...g, name: v }))} /></Card>
+        <Card>
+          <Lbl>Number of Players</Lbl>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+              <button key={n} onClick={() => adjustPlayers(n)} style={{ width: 36, height: 36, borderRadius: 10, border: numPlayers === n ? "2px solid #e63946" : "2px solid transparent", background: numPlayers === n ? "#fff0f0" : "#f2f2f2", color: numPlayers === n ? "#e63946" : "#555", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{n}</button>
+            ))}
+          </div>
+        </Card>
+        <Card>
+          <Lbl>Player Names</Lbl>
+          {Array.from({ length: numPlayers }).map((_, i) => (
+            <div key={i} style={{ marginBottom: i < numPlayers - 1 ? 10 : 0 }}>
+              <Inp bold value={d.players[i] || ""} placeholder={`Player ${i + 1}`} onChange={v => setP(i, v)} />
+            </div>
+          ))}
+        </Card>
+        <Card>
+          <Lbl>Win Target</Lbl>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[200, 300, 500, 1000].map(n => (
+              <button key={n} onClick={() => setD(g => ({ ...g, targetScore: n }))} style={{ flex: 1, padding: "10px 4px", borderRadius: 12, border: d.targetScore === n ? "2px solid #e63946" : "2px solid transparent", background: d.targetScore === n ? "#fff0f0" : "#f2f2f2", color: d.targetScore === n ? "#e63946" : "#555", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{n} pts</button>
+            ))}
+          </div>
+        </Card>
+        <Btn primary disabled={!ok} onClick={() => onStart({ ...d, players: d.players.slice(0, numPlayers), id: Date.now() })} style={{ background: "#e63946" }}>Start Game →</Btn>
+      </div>
+    </div>
+  );
+}
+
+function UNOGame({ game, onSubmit, onHistory, onShare, onRules, onEnd, onHome, showToast, lang, setLang }) {
+  const scores = calcUNOScores(game.rounds);
+  const rn = game.rounds.length + 1;
+  const p = game.players;
+  const [winner, setWinner] = useState(0);
+  const [pts, setPts] = useState(p.map(() => ""));
+  const COLORS = ["#e63946", "#f4a261", "#2a9d8f", "#4a7cfc", "#9b5de5", "#f15bb5", "#00bbf9", "#fee440", "#06d6a0", "#fb8500"];
+
+  const submit = () => {
+    // Winner gets 0, others' cards are summed and added to winner's total
+    const scores = p.map((_, i) => i === winner ? p.reduce((a, _, j) => j !== winner ? a + (Number(pts[j]) || 0) : a, 0) : 0);
+    onSubmit({ winner, winnerName: p[winner], cardPts: pts.map(Number), scores, ts: new Date().toISOString() });
+    setPts(p.map(() => ""));
+    setWinner(0);
+  };
+  const canSubmit = p.every((_, i) => i === winner || pts[i] !== "");
+  const totalPts = game.rounds.reduce((a, r) => a + (r.scores ? r.scores[0] : 0), 0); // not used for individual
+
+  return (
+    <div>
+      <div style={{ padding: "48px 20px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          <button onClick={onHome} style={BK}>← Games</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: "#e63946", borderRadius: 6, padding: "2px 8px" }}>UNO</span>
+            <h1 style={{ ...PT, fontSize: 18, margin: 0 }}>{game.name || p.join(" · ")}</h1>
+          </div>
+          <p style={{ margin: "2px 0 0", color: "#bbb", fontSize: 12 }}>Round {rn} · Target: {game.targetScore} pts</p>
+        </div>
+        <div style={{ display: "flex", gap: 6, paddingTop: 28 }}>
+          <Pill onClick={onRules}>📖 Rules</Pill>
+          <Pill onClick={onHistory}>History</Pill>
+        </div>
+      </div>
+      {/* Scoreboard */}
+      <div style={{ margin: "13px 20px 0", overflowX: "auto" }}>
+        <div style={{ display: "flex", gap: 8, minWidth: "max-content" }}>
+          {p.map((pl, i) => {
+            const sc = game.rounds.reduce((a, r) => a + (r.scores ? r.scores[i] : 0), 0);
+            const pct = Math.min((sc / game.targetScore) * 100, 100);
+            return (
+              <div key={i} style={{ minWidth: 90, background: "white", borderRadius: 14, padding: "11px 10px", textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", border: sc >= game.targetScore ? "2px solid #e63946" : "2px solid transparent" }}>
+                <div style={{ fontSize: 10, color: COLORS[i % COLORS.length], fontWeight: 700, textTransform: "uppercase", marginBottom: 2 }}>{pl}</div>
+                <div style={{ fontSize: 26, fontWeight: 900, color: "#111", lineHeight: 1 }}>{sc}</div>
+                <div style={{ height: 4, background: "#f0f0f0", borderRadius: 4, marginTop: 5, overflow: "hidden" }}>
+                  <div style={{ width: pct + "%", height: "100%", background: sc >= game.targetScore ? "#e63946" : COLORS[i % COLORS.length], transition: "width 0.4s" }} />
+                </div>
+                {sc >= game.targetScore && <div style={{ fontSize: 9, color: "#e63946", fontWeight: 700, marginTop: 3 }}>BUST!</div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ padding: "13px 20px 40px", display: "flex", flexDirection: "column", gap: 13 }}>
+        <Card>
+          <Lbl>Who called UNO? (Round Winner)</Lbl>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {p.map((pl, i) => (
+              <button key={i} onClick={() => setWinner(i)} style={{ padding: "9px 14px", borderRadius: 20, fontSize: 13, fontWeight: 700, cursor: "pointer", background: winner === i ? COLORS[i % COLORS.length] : "#f2f2f2", color: winner === i ? "white" : "#444", border: winner === i ? "2px solid " + COLORS[i % COLORS.length] : "2px solid transparent", transition: "all 0.12s" }}>{pl}</button>
+            ))}
+          </div>
+          <div style={{ marginTop: 8, fontSize: 12, color: "#888" }}>Winner gets 0. Others' cards are counted.</div>
+        </Card>
+        <Card>
+          <Lbl>Card Points in Hand (for each loser)</Lbl>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {p.map((pl, i) => i === winner ? null : (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: COLORS[i % COLORS.length], flexShrink: 0 }} />
+                <div style={{ width: 90, fontSize: 13, fontWeight: 600, color: "#333" }}>{pl}</div>
+                <input type="number" min="0" value={pts[i]} onChange={e => { const x = [...pts]; x[i] = e.target.value; setPts(x); }}
+                  placeholder="0" style={{ flex: 1, padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e8e8e8", fontSize: 15, fontWeight: 700, outline: "none", textAlign: "center" }} />
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 10, background: "#f0f5ff", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: "#4a7cfc" }}>
+            <strong>Card values:</strong> 0-9 = face value · Skip/Rev/+2 = 20 pts · Wild/+4 = 50 pts
+          </div>
+        </Card>
+        <Btn primary disabled={!canSubmit} onClick={submit} style={{ background: "#e63946" }}>Record Round {rn}</Btn>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onShare} style={SB}>📤 Share</button>
+          <button onClick={() => { if (window.confirm("End game?")) onEnd(); }} style={SB}>🏁 End</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UNORules({ onBack }) {
+  const Section = ({ title, children }) => (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ fontWeight: 800, fontSize: 15, color: "#e63946", marginBottom: 8 }}>{title}</div>
+      {children}
+    </div>
+  );
+  const Row = ({ label, val, color }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 12px", background: "#f9f9f9", borderRadius: 10, marginBottom: 5 }}>
+      <span style={{ fontSize: 13, color: "#333" }}>{label}</span>
+      <span style={{ fontSize: 13, fontWeight: 700, color: color || "#333" }}>{val}</span>
+    </div>
+  );
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+        <span style={{ fontSize: 22 }}>🃏</span>
+        <h1 style={{ ...PT, color: "#e63946" }}>UNO Rules</h1>
+      </div>
+      <Section title="🎯 Objective">
+        <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>Be the first player to get rid of all your cards each round. Earn points from other players' remaining cards. First to reach the target score <strong>loses</strong> (or play until someone hits it and the lowest scorer wins — agree before starting).</p>
+      </Section>
+      <Section title="🃏 Setup">
+        <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>Shuffle the 108-card deck. Deal <strong>7 cards</strong> to each player. Place remaining cards face-down as draw pile. Flip top card to start discard pile (if Wild, return and redraw).</p>
+      </Section>
+      <Section title="▶️ Gameplay">
+        <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>On your turn, play a card matching the <strong>color, number, or symbol</strong> of the top discard card. If you can't play, draw one card (play it if you can). Play passes clockwise.</p>
+      </Section>
+      <Section title="🃏 Special Cards">
+        <Row label="Skip" val="Next player misses turn" color="#f4a261" />
+        <Row label="Reverse" val="Direction reverses" color="#2a9d8f" />
+        <Row label="Draw +2" val="Next player draws 2, skips turn" color="#e63946" />
+        <Row label="Wild" val="Choose any color" color="#9b5de5" />
+        <Row label="Wild Draw +4" val="Choose color + next draws 4" color="#111" />
+      </Section>
+      <Section title="📢 Calling UNO!">
+        <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>When you have <strong>1 card left</strong>, you MUST shout "UNO!" before the next player plays. If caught without calling it, draw 2 penalty cards.</p>
+      </Section>
+      <Section title="🏆 Scoring">
+        <Row label="Number cards" val="Face value (0–9)" />
+        <Row label="Skip / Reverse / Draw +2" val="20 points each" color="#f4a261" />
+        <Row label="Wild / Wild Draw +4" val="50 points each" color="#9b5de5" />
+        <p style={{ fontSize: 13, color: "#555", marginTop: 8, lineHeight: 1.6 }}>When a player goes out, all other players count the cards in their hand. The <strong>winner collects those points</strong>. First to reach the target score wins (or busts — agree on rule before starting).</p>
+      </Section>
+      <Section title="⚠️ House Rules (common)">
+        <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>• Stacking Draw +2 cards is common but <em>not</em> official rules<br />• Jump-in (play matching card instantly) is a popular variant<br />• 7-0: 7 = swap with any player; 0 = everyone passes hand left</p>
+      </Section>
+    </div>
+  );
+}
+
+function UNOHistory({ game, onBack, onShare }) {
+  const p = game.players;
+  const COLORS = ["#e63946", "#f4a261", "#2a9d8f", "#4a7cfc", "#9b5de5", "#f15bb5", "#00bbf9", "#fee440", "#06d6a0", "#fb8500"];
+  let cum = p.map(() => 0);
+  const rows = game.rounds.map(r => {
+    if (r.scores) cum = cum.map((c, i) => c + r.scores[i]);
+    return { r, cum: [...cum] };
+  });
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <h1 style={PT}>Round History</h1>
+      <p style={{ margin: "2px 0 14px", color: "#999", fontSize: 13 }}>{game.rounds.length} rounds</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+        {[...rows].reverse().map(({ r, cum }, i) => {
+          const ri = game.rounds.length - i;
+          return (
+            <div key={i} style={{ background: "#f7f7f7", borderRadius: 14, padding: "12px 14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: "#999", fontWeight: 600, textTransform: "uppercase" }}>Rd {ri}</span>
+                <span style={{ fontSize: 11, color: "#4a7cfc", fontWeight: 700 }}>🏆 {r.winnerName}</span>
+                {r.ts && <span style={{ fontSize: 10, color: "#ccc" }}>{fmt(r.ts)}</span>}
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {p.map((pl, j) => (
+                  <div key={j} style={{ background: "white", borderRadius: 9, padding: "6px 10px", textAlign: "center", minWidth: 60 }}>
+                    <div style={{ fontSize: 10, color: COLORS[j % COLORS.length], fontWeight: 700 }}>{pl}</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: j === r.winner ? "#16a34a" : "#e63946" }}>+{r.scores?.[j] || 0}</div>
+                    <div style={{ fontSize: 10, color: "#aaa" }}>∑{cum[j]}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 14 }}><Btn onClick={onShare}>Share Scorecard</Btn></div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── 28 CARD GAME ──────────────────────────════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+const new28Game = () => ({
+  id: Date.now(), type: "g28", name: "",
+  teams: [{ name: "Team A", players: ["", ""] }, { name: "Team B", players: ["", ""] }],
+  rounds: [],
+  createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), finished: false
+});
+
+const calc28Scores = rounds => rounds.reduce((a, r) => [a[0] + (r.pts?.[0] || 0), a[1] + (r.pts?.[1] || 0)], [0, 0]);
+
+function G28Setup({ onBack, onStart }) {
+  const [d, setD] = useState(new28Game);
+  const st = (ti, f, v) => setD(g => { const t = JSON.parse(JSON.stringify(g.teams)); if (f === "name") t[ti].name = v; else t[ti].players[f] = v; return { ...g, teams: t }; });
+  const ok = d.teams[0].name.trim() && d.teams[1].name.trim() && d.teams.every(t => t.players.every(p => p.trim()));
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: "#f4a261", borderRadius: 8, padding: "3px 10px" }}>28</span>
+        <h1 style={PT}>New Game</h1>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Card><Lbl>Game Name <M>(optional)</M></Lbl><Inp value={d.name} placeholder="e.g. Sunday Game" onChange={v => setD(g => ({ ...g, name: v }))} /></Card>
+        {[0, 1].map(ti => (
+          <Card key={ti}><Lbl>Team {ti + 1}</Lbl>
+            <Inp bold value={d.teams[ti].name} placeholder={`Team ${ti + 1} name`} onChange={v => st(ti, "name", v)} />
+            <div style={{ height: 10 }} />
+            {[0, 1].map(pi => <div key={pi} style={{ marginBottom: pi === 0 ? 8 : 0 }}><Inp value={d.teams[ti].players[pi]} placeholder={`Player ${pi + 1}`} onChange={v => st(ti, pi, v)} /></div>)}
+          </Card>
+        ))}
+        <Btn primary disabled={!ok} onClick={() => onStart({ ...d, id: Date.now() })} style={{ background: "#f4a261", color: "white" }}>Start Game →</Btn>
+      </div>
+    </div>
+  );
+}
+
+function G28Game({ game, onSubmit, onHistory, onRules, onEnd, onHome, showToast }) {
+  const scores = calc28Scores(game.rounds);
+  const rn = game.rounds.length + 1;
+  const t = game.teams;
+  const [bid, setBid] = useState("");
+  const [bidTeam, setBidTeam] = useState(0);
+  const [trump, setTrump] = useState(null);
+  const [tricksWon, setTricksWon] = useState(["", ""]);
+  const C0 = "#f4a261", C1 = "#4a7cfc";
+  const totalTricks = Number(tricksWon[0]) + Number(tricksWon[1]);
+  const bidNum = Number(bid);
+  const canSubmit = bid && tricksWon[0] !== "" && tricksWon[1] !== "" && totalTricks === 8;
+
+  const submit = () => {
+    const bidderWon = Number(tricksWon[bidTeam]) >= bidNum;
+    // Bidder makes: get points = bid; opponent gets 8-bid
+    // Bidder fails: opponent gets bid+extra
+    let pts = [0, 0];
+    if (bidderWon) {
+      pts[bidTeam] = bidNum;
+      pts[1 - bidTeam] = 8 - bidNum;
+    } else {
+      pts[1 - bidTeam] = bidNum;
+      pts[bidTeam] = -(bidNum);
+    }
+    onSubmit({ bid: bidNum, bidTeam, trump, tricksWon: [Number(tricksWon[0]), Number(tricksWon[1])], bidderWon, pts, ts: new Date().toISOString() });
+    setBid(""); setBidTeam(0); setTrump(null); setTricksWon(["", ""]);
+  };
+
+  return (
+    <div>
+      <div style={{ padding: "48px 20px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          <button onClick={onHome} style={BK}>← Games</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: C0, borderRadius: 6, padding: "2px 8px" }}>28</span>
+            <h1 style={{ ...PT, fontSize: 18, margin: 0 }}>{game.name || t[0].name + " vs " + t[1].name}</h1>
+          </div>
+          <p style={{ margin: "2px 0 0", color: "#bbb", fontSize: 12 }}>Round {rn}</p>
+        </div>
+        <div style={{ display: "flex", gap: 6, paddingTop: 28 }}>
+          <Pill onClick={onRules}>📖 Rules</Pill>
+          <Pill onClick={onHistory}>History</Pill>
+        </div>
+      </div>
+      <div style={{ margin: "13px 20px 0", display: "flex", gap: 10 }}>
+        {[0, 1].map(i => (
+          <div key={i} style={{ flex: 1, background: "white", borderRadius: 14, padding: "13px 10px", textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+            <div style={{ fontSize: 11, color: i === 0 ? C0 : C1, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>{t[i].name}</div>
+            <div style={{ fontSize: 36, fontWeight: 900, color: scores[i] < 0 ? "#e63946" : "#111", lineHeight: 1 }}>{scores[i]}</div>
+            <div style={{ fontSize: 11, color: "#bbb", marginTop: 3 }}>{t[i].players.join(" & ")}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ padding: "13px 20px 40px", display: "flex", flexDirection: "column", gap: 13 }}>
+        <Card>
+          <Lbl>Trump Suit <M>(optional)</M></Lbl>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+            {SUITS.map(s => { const sel = trump === s, red = RED.has(s); return <button key={s} onClick={() => setTrump(sel ? null : s)} style={{ width: 52, height: 52, borderRadius: 13, fontSize: 24, cursor: "pointer", background: sel ? (red ? "#fff0f0" : "#fff8e1") : "#f7f7f7", border: sel ? "2px solid " + (red ? "#e63946" : "#f4a261") : "2px solid #ebebeb", color: red ? "#e63946" : "#1a1a2e", transform: sel ? "scale(1.1)" : "scale(1)", transition: "all 0.15s" }}>{s}</button>; })}
+          </div>
+        </Card>
+        <Card>
+          <Lbl>Bid</Lbl>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {[0, 1].map(i => <button key={i} onClick={() => setBidTeam(i)} style={{ flex: 1, padding: "10px", borderRadius: 12, border: bidTeam === i ? "2px solid " + (i === 0 ? C0 : C1) : "2px solid transparent", background: bidTeam === i ? (i === 0 ? "#fff4ec" : "#f0f5ff") : "#f7f7f7", fontWeight: 700, fontSize: 13, color: bidTeam === i ? (i === 0 ? C0 : C1) : "#555", cursor: "pointer" }}>{t[i].name} bids</button>)}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
+            {[15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28].map(n => {
+              const sel = bid === String(n);
+              return <button key={n} onClick={() => setBid(sel ? "" : String(n))} style={{ width: 42, height: 38, borderRadius: 10, fontSize: 14, fontWeight: sel ? 800 : 500, background: sel ? C0 : "#f2f2f2", color: sel ? "white" : "#333", border: sel ? "2px solid " + C0 : "2px solid transparent", cursor: "pointer" }}>{n}</button>;
+            })}
+          </div>
+        </Card>
+        <Card>
+          <Lbl>Tricks Won <M>(must total 8)</M></Lbl>
+          <div style={{ display: "flex", gap: 12 }}>
+            {[0, 1].map(ti => (
+              <div key={ti} style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, color: ti === 0 ? C0 : C1, fontWeight: 700, textAlign: "center", marginBottom: 8 }}>{t[ti].name}</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center" }}>
+                  {[...Array(9)].map((_, n) => {
+                    const ov = tricksWon[1 - ti] !== "" ? Number(tricksWon[1 - ti]) : null;
+                    const dis = ov !== null && n + ov > 8;
+                    const sel = tricksWon[ti] === String(n);
+                    return <button key={n} disabled={dis} onClick={() => { const x = [...tricksWon]; x[ti] = String(n); x[1 - ti] = String(8 - n); setTricksWon(x); }} style={{ width: 34, height: 34, borderRadius: 9, fontSize: 13, cursor: dis ? "not-allowed" : "pointer", fontWeight: sel ? 800 : 500, background: sel ? (ti === 0 ? C0 : C1) : dis ? "#fafafa" : "#f2f2f2", color: sel ? "white" : dis ? "#ccc" : "#333", border: sel ? "2px solid " + (ti === 0 ? C0 : C1) : "2px solid transparent" }}>{n}</button>;
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          {totalTricks > 0 && totalTricks !== 8 && <div style={{ marginTop: 8, color: "#e63946", fontSize: 12, textAlign: "center", fontWeight: 600 }}>⚠ Must total 8</div>}
+        </Card>
+        <Btn primary disabled={!canSubmit} onClick={submit} style={{ background: C0, color: "white" }}>Record Round {rn}</Btn>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => { if (window.confirm("End game?")) onEnd(); }} style={SB}>🏁 End</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function G28Rules({ onBack }) {
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+        <span style={{ fontSize: 22 }}>🃏</span>
+        <h1 style={{ ...PT, color: "#f4a261" }}>28 Rules</h1>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Card><div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 6 }}>🎯 Objective</div><p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>2 teams of 2. Win tricks to score points. The team that bids must meet their bid to score. First team to a pre-agreed score (usually 6 game points) wins.</p></Card>
+        <Card><div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 6 }}>🃏 Deck & Card Values</div>
+          <p style={{ fontSize: 13, color: "#555", marginBottom: 8 }}>32 cards: 7, 8, 9, 10, J, Q, K, A of all 4 suits. <strong>Total = 28 points.</strong></p>
+          {[["J", "3 pts"], ["9", "2 pts"], ["A", "1 pt"], ["10", "1 pt"], ["K/Q/8/7", "0 pts"]].map(([c, v]) => (
+            <div key={c} style={{ display: "flex", justifyContent: "space-between", padding: "6px 10px", background: "#f9f9f9", borderRadius: 9, marginBottom: 4 }}>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>{c}</span><span style={{ fontSize: 13, color: "#555" }}>{v}</span>
+            </div>
+          ))}
+        </Card>
+        <Card><div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 6 }}>🔢 Bidding</div><p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>Each player is dealt 4 cards. Players bid how many points their team will make. Bid must be between 15–28. Highest bid wins and sets the trump suit secretly. Remaining cards are then dealt (4 more each).</p></Card>
+        <Card><div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 6 }}>▶️ Gameplay</div><p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>8 tricks total. Must follow suit. Trump revealed when a player can't follow suit. Highest trump wins; else highest card of led suit wins. Partners sit opposite each other.</p></Card>
+        <Card><div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 6 }}>🏆 Scoring</div><p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>• Bidding team makes their bid → score 1 game point; opponents score 0<br />• Bidding team fails → opponents score 1 game point (or 2 if bid was high)<br />• If bid = 28 and made → bidding team scores 4 game points<br />• First team to 6 game points wins the match</p></Card>
+      </div>
+    </div>
+  );
+}
+
+function G28History({ game, onBack }) {
+  const t = game.teams;
+  const scores = calc28Scores(game.rounds);
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <h1 style={PT}>Round History</h1>
+      <p style={{ margin: "2px 0 14px", color: "#999", fontSize: 13 }}>{game.rounds.length} rounds · Score: {t[0].name} {scores[0]} – {scores[1]} {t[1].name}</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+        {[...game.rounds].reverse().map((r, i) => {
+          const ri = game.rounds.length - i;
+          return (
+            <div key={i} style={{ background: "#f7f7f7", borderRadius: 14, padding: "13px 15px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: "#999", fontWeight: 600 }}>Rd {ri}</span>
+                <span style={{ fontSize: 11, color: r.trump ? (RED.has(r.trump) ? "#e63946" : "#333") : "#aaa" }}>{r.trump || "No trump"}</span>
+                {r.ts && <span style={{ fontSize: 10, color: "#ccc" }}>{fmt(r.ts)}</span>}
+              </div>
+              <div style={{ fontSize: 13, color: "#333", marginBottom: 4 }}>
+                <strong>{t[r.bidTeam]?.name}</strong> bid <strong>{r.bid}</strong> — {r.bidderWon ? "✅ Made it" : "❌ Failed"}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {[0, 1].map(j => <div key={j} style={{ flex: 1, background: "white", borderRadius: 9, padding: "6px", textAlign: "center" }}><div style={{ fontSize: 11, color: "#888" }}>{t[j].name}</div><div style={{ fontSize: 16, fontWeight: 800, color: r.pts?.[j] < 0 ? "#e63946" : "#16a34a" }}>{r.pts?.[j] >= 0 ? "+" : ""}{r.pts?.[j] ?? 0}</div></div>)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── RULES-ONLY GAMES (Teen Patti, Poker, Rummy) ────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// These games have chip/cash-based scoring that varies widely by format.
+// We provide full instructions + score tracker (each player's chip count).
+
+const newTPGame = () => ({ id: Date.now(), type: "tp", name: "", players: ["", "", ""], chipStart: 100, rounds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), finished: false });
+const newPokerGame = () => ({ id: Date.now(), type: "poker", name: "", players: ["", "", ""], chipStart: 100, rounds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), finished: false });
+const newRummyGame = () => ({ id: Date.now(), type: "rummy", name: "", players: ["", "", ""], rounds: [], targetScore: 100, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), finished: false });
+
+// Generic chip-based game setup
+function ChipGameSetup({ onBack, onStart, gameType, color, label, minPlayers = 2, maxPlayers = 10 }) {
+  const factory = gameType === "tp" ? newTPGame : newPokerGame;
+  const [d, setD] = useState(factory);
+  const [n, setN] = useState(3);
+  const setP = (i, v) => setD(g => { const p = [...g.players]; p[i] = v; return { ...g, players: p }; });
+  const adjustN = num => { setN(num); setD(g => { const p = [...g.players]; while (p.length < num) p.push(""); return { ...g, players: p.slice(0, num) }; }); };
+  const ok = d.players.slice(0, n).every(p => p.trim());
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: color, borderRadius: 8, padding: "3px 10px" }}>{label}</span>
+        <h1 style={PT}>New Game</h1>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Card><Lbl>Game Name <M>(optional)</M></Lbl><Inp value={d.name} placeholder="e.g. Friday Night" onChange={v => setD(g => ({ ...g, name: v }))} /></Card>
+        <Card>
+          <Lbl>Players ({minPlayers}–{maxPlayers})</Lbl>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+            {Array.from({ length: maxPlayers - minPlayers + 1 }, (_, i) => i + minPlayers).map(num => (
+              <button key={num} onClick={() => adjustN(num)} style={{ width: 36, height: 36, borderRadius: 10, border: n === num ? "2px solid " + color : "2px solid transparent", background: n === num ? color + "22" : "#f2f2f2", color: n === num ? color : "#555", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{num}</button>
+            ))}
+          </div>
+          {Array.from({ length: n }).map((_, i) => <div key={i} style={{ marginBottom: i < n - 1 ? 9 : 0 }}><Inp bold value={d.players[i] || ""} placeholder={`Player ${i + 1}`} onChange={v => setP(i, v)} /></div>)}
+        </Card>
+        <Card>
+          <Lbl>Starting Chips per Player</Lbl>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[50, 100, 200, 500, 1000].map(c => <button key={c} onClick={() => setD(g => ({ ...g, chipStart: c }))} style={{ flex: 1, padding: "9px 4px", borderRadius: 11, border: d.chipStart === c ? "2px solid " + color : "2px solid transparent", background: d.chipStart === c ? color + "22" : "#f2f2f2", color: d.chipStart === c ? color : "#555", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{c}</button>)}
+          </div>
+        </Card>
+        <Btn primary disabled={!ok} onClick={() => onStart({ ...d, players: d.players.slice(0, n), id: Date.now() })} style={{ background: color }}>Start Game →</Btn>
+      </div>
+    </div>
+  );
+}
+
+// Generic chip tracker game screen
+function ChipGame({ game, onSubmit, onHistory, onRules, onEnd, onHome, showToast, color, label }) {
+  const p = game.players;
+  const COLORS = ["#4a7cfc", "#e63946", "#16a34a", "#f4a261", "#9b5de5", "#f15bb5", "#00bbf9", "#fee440", "#06d6a0"];
+  // Current chips = start + all round deltas
+  const chips = p.map((_, i) => game.chipStart + game.rounds.reduce((a, r) => a + (r.deltas?.[i] || 0), 0));
+  const [deltas, setDeltas] = useState(p.map(() => ""));
+  const [note, setNote] = useState("");
+  const setD = (i, v) => { const x = [...deltas]; x[i] = v; setDeltas(x); };
+  const netZero = deltas.every(d => d !== "") && deltas.reduce((a, b) => a + Number(b), 0) === 0;
+  const submit = () => {
+    onSubmit({ deltas: deltas.map(Number), note, ts: new Date().toISOString() });
+    setDeltas(p.map(() => "")); setNote("");
+  };
+  return (
+    <div>
+      <div style={{ padding: "48px 20px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          <button onClick={onHome} style={BK}>← Games</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: color, borderRadius: 6, padding: "2px 8px" }}>{label}</span>
+            <h1 style={{ ...PT, fontSize: 18, margin: 0 }}>{game.name || p.join(" · ")}</h1>
+          </div>
+          <p style={{ margin: "2px 0 0", color: "#bbb", fontSize: 12 }}>Round {game.rounds.length + 1} · Start: {game.chipStart} chips each</p>
+        </div>
+        <div style={{ display: "flex", gap: 6, paddingTop: 28 }}>
+          <Pill onClick={onRules}>📖 Rules</Pill>
+          <Pill onClick={onHistory}>History</Pill>
+        </div>
+      </div>
+      <div style={{ margin: "13px 20px 0", overflowX: "auto" }}>
+        <div style={{ display: "flex", gap: 8, minWidth: "max-content" }}>
+          {p.map((pl, i) => (
+            <div key={i} style={{ minWidth: 85, background: "white", borderRadius: 13, padding: "11px 8px", textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+              <div style={{ fontSize: 10, color: COLORS[i % COLORS.length], fontWeight: 700, textTransform: "uppercase", marginBottom: 2 }}>{pl}</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: chips[i] <= 0 ? "#e63946" : "#111", lineHeight: 1 }}>{chips[i]}</div>
+              <div style={{ fontSize: 10, color: "#bbb", marginTop: 2 }}>chips</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ padding: "13px 20px 40px", display: "flex", flexDirection: "column", gap: 13 }}>
+        <Card>
+          <Lbl>Record Round Result (chip changes)</Lbl>
+          <p style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>Enter +/- chips for each player. Total must be zero (chips only move between players).</p>
+          {p.map((pl, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{ width: 10, height: 10, borderRadius: "50%", background: COLORS[i % COLORS.length], flexShrink: 0 }} />
+              <div style={{ width: 80, fontSize: 13, fontWeight: 600 }}>{pl}</div>
+              <input type="number" value={deltas[i]} onChange={e => setD(i, e.target.value)} placeholder="±0"
+                style={{ flex: 1, padding: "9px 10px", borderRadius: 10, border: "1.5px solid #e8e8e8", fontSize: 15, fontWeight: 700, outline: "none", textAlign: "center" }} />
+            </div>
+          ))}
+          {deltas.every(d => d !== "") && !netZero && (
+            <div style={{ color: "#e63946", fontSize: 12, textAlign: "center", fontWeight: 600 }}>⚠ Net must be 0 (currently {deltas.reduce((a, b) => a + Number(b), 0) > 0 ? "+" : ""}{deltas.reduce((a, b) => a + Number(b), 0)})</div>
+          )}
+          <Inp value={note} placeholder="Note (optional, e.g. 'Poker hand')" onChange={setNote} />
+        </Card>
+        <Btn primary disabled={!netZero} onClick={submit} style={{ background: color }}>Record Round {game.rounds.length + 1}</Btn>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => { if (window.confirm("End game?")) onEnd(); }} style={SB}>🏁 End</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChipHistory({ game, onBack, color, label }) {
+  const p = game.players;
+  const COLORS = ["#4a7cfc", "#e63946", "#16a34a", "#f4a261", "#9b5de5", "#f15bb5", "#00bbf9", "#fee440", "#06d6a0"];
+  let chips = p.map(() => game.chipStart);
+  const rows = game.rounds.map(r => { if (r.deltas) chips = chips.map((c, i) => c + r.deltas[i]); return { r, chips: [...chips] }; });
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: color, borderRadius: 8, padding: "3px 10px" }}>{label}</span>
+        <h1 style={PT}>History</h1>
+      </div>
+      {[...rows].reverse().map(({ r, chips }, i) => {
+        const ri = game.rounds.length - i;
+        return (
+          <div key={i} style={{ background: "#f7f7f7", borderRadius: 14, padding: "12px 14px", marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: "#999", fontWeight: 600 }}>Rd {ri}</span>
+              {r.note && <span style={{ fontSize: 11, color: "#aaa" }}>{r.note}</span>}
+              {r.ts && <span style={{ fontSize: 10, color: "#ccc" }}>{fmt(r.ts)}</span>}
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {p.map((pl, j) => (
+                <div key={j} style={{ background: "white", borderRadius: 9, padding: "6px 10px", textAlign: "center", minWidth: 60 }}>
+                  <div style={{ fontSize: 10, color: COLORS[j % COLORS.length], fontWeight: 700 }}>{pl}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: r.deltas?.[j] >= 0 ? "#16a34a" : "#e63946" }}>{r.deltas?.[j] >= 0 ? "+" : ""}{r.deltas?.[j] ?? 0}</div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#111" }}>{chips[j]}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Visual Combination Guides ─────────────────────────────────────────────────
+function HandVisual({ title, cards, desc, color }) {
+  return (
+    <div style={{ background: "#f9f9f9", borderRadius: 14, padding: "12px 14px", marginBottom: 10 }}>
+      <div style={{ fontWeight: 700, fontSize: 14, color: color || "#333", marginBottom: 6 }}>{title}</div>
+      <div style={{ display: "flex", gap: 5, marginBottom: 6, flexWrap: "wrap" }}>
+        {cards.map((c, i) => {
+          const isRed = c.includes("♥") || c.includes("♦");
+          return <div key={i} style={{ background: "white", border: "1.5px solid #e8e8e8", borderRadius: 8, padding: "6px 8px", fontSize: 13, fontWeight: 700, color: isRed ? "#e63946" : "#1a1a2e", minWidth: 32, textAlign: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>{c}</div>;
+        })}
+      </div>
+      <div style={{ fontSize: 12, color: "#666", lineHeight: 1.5 }}>{desc}</div>
+    </div>
+  );
+}
+
+function TeenPattiRules({ onBack }) {
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+        <span style={{ fontSize: 22 }}>🃏</span>
+        <h1 style={{ ...PT, color: "#9b5de5" }}>Teen Patti Rules</h1>
+      </div>
+      <div style={{ background: "#f5f0ff", border: "1px solid #d8b4fe", borderRadius: 14, padding: "11px 14px", marginBottom: 16, fontSize: 13, color: "#6d28d9" }}>
+        Also called <strong>Indian Poker</strong> or <strong>Flush</strong>. 3–6 players, standard 52-card deck, no jokers.
+      </div>
+      <div style={{ fontWeight: 800, fontSize: 14, color: "#9b5de5", marginBottom: 10 }}>🏆 Hand Rankings (High → Low)</div>
+      <HandVisual title="Trail / Three of a Kind" cards={["A♠", "A♥", "A♦"]} color="#9b5de5" desc="Three cards of same rank. Three Aces is highest, three 2s is lowest." />
+      <HandVisual title="Pure Sequence (Straight Flush)" cards={["J♥", "Q♥", "K♥"]} color="#e63946" desc="Three consecutive cards of same suit. A-K-Q is highest, A-2-3 is lowest." />
+      <HandVisual title="Sequence (Straight/Run)" cards={["9♠", "10♥", "J♦"]} color="#f4a261" desc="Three consecutive cards of different suits. Same ranking as Pure Sequence otherwise." />
+      <HandVisual title="Colour (Flush)" cards={["3♠", "7♠", "K♠"]} color="#4a7cfc" desc="Three cards of same suit, not in sequence. Compare highest card, then second, then third." />
+      <HandVisual title="Pair" cards={["8♦", "8♣", "K♠"]} color="#16a34a" desc="Two cards of same rank. Higher pair wins; if equal, compare the kicker." />
+      <HandVisual title="High Card" cards={["2♣", "5♥", "9♦"]} color="#888" desc="None of the above. Compare highest card, then second, then third." />
+      <Card style={{ marginTop: 4 }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: "#9b5de5", marginBottom: 8 }}>▶️ How to Play</div>
+        <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>• Dealer deals 3 cards face-down to each player<br />• Ante (boot) collected before dealing<br />• <strong>Blind players</strong> bet without seeing cards (minimum = current stake)<br />• <strong>Seen players</strong> bet after seeing cards (minimum = 2× current stake)<br />• Players can call (chaal), raise, or fold<br />• <strong>Sideshow:</strong> seen player can request comparison with previous seen player; lower hand must fold<br />• Last player remaining wins the pot, or best hand at showdown</p>
+      </Card>
+    </div>
+  );
+}
+
+function PokerRules({ onBack }) {
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+        <span style={{ fontSize: 22 }}>🃏</span>
+        <h1 style={{ ...PT, color: "#2a9d8f" }}>Poker Rules</h1>
+      </div>
+      <div style={{ background: "#f0fdfa", border: "1px solid #99f6e4", borderRadius: 14, padding: "11px 14px", marginBottom: 16, fontSize: 13, color: "#0f766e" }}>
+        <strong>Texas Hold'em</strong> — the most popular variant. 2–10 players, 52-card deck.
+      </div>
+      <div style={{ fontWeight: 800, fontSize: 14, color: "#2a9d8f", marginBottom: 10 }}>🏆 Hand Rankings (High → Low)</div>
+      <HandVisual title="Royal Flush" cards={["10♥", "J♥", "Q♥", "K♥", "A♥"]} color="#e63946" desc="A-K-Q-J-10 of the same suit. Unbeatable." />
+      <HandVisual title="Straight Flush" cards={["6♠", "7♠", "8♠", "9♠", "10♠"]} color="#9b5de5" desc="Five consecutive cards of same suit." />
+      <HandVisual title="Four of a Kind" cards={["K♠", "K♥", "K♦", "K♣", "3♠"]} color="#4a7cfc" desc="Four cards of the same rank." />
+      <HandVisual title="Full House" cards={["Q♠", "Q♥", "Q♦", "8♣", "8♥"]} color="#f4a261" desc="Three of a kind + a pair." />
+      <HandVisual title="Flush" cards={["2♥", "5♥", "8♥", "J♥", "A♥"]} color="#e63946" desc="Five cards of the same suit." />
+      <HandVisual title="Straight" cards={["5♠", "6♥", "7♦", "8♣", "9♠"]} color="#16a34a" desc="Five consecutive cards of any suit." />
+      <HandVisual title="Three of a Kind" cards={["J♠", "J♥", "J♦", "4♣", "7♠"]} color="#2a9d8f" desc="Three cards of the same rank." />
+      <HandVisual title="Two Pair" cards={["A♠", "A♥", "K♦", "K♣", "3♠"]} color="#888" desc="Two different pairs." />
+      <HandVisual title="One Pair" cards={["9♠", "9♥", "4♦", "7♣", "2♠"]} color="#aaa" desc="One pair of matching cards." />
+      <HandVisual title="High Card" cards={["2♣", "6♥", "9♦", "J♠", "A♣"]} color="#bbb" desc="Highest card plays when no other hand." />
+      <Card style={{ marginTop: 4 }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: "#2a9d8f", marginBottom: 8 }}>▶️ Texas Hold'em Flow</div>
+        <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>1. <strong>Blinds:</strong> Small blind + big blind posted<br />2. <strong>Hole cards:</strong> 2 private cards dealt to each player<br />3. <strong>Pre-flop:</strong> First betting round (fold/call/raise)<br />4. <strong>Flop:</strong> 3 community cards revealed → betting<br />5. <strong>Turn:</strong> 4th community card → betting<br />6. <strong>River:</strong> 5th community card → final betting<br />7. <strong>Showdown:</strong> Best 5-card hand from 7 cards wins the pot</p>
+      </Card>
+    </div>
+  );
+}
+
+function RummyRules({ onBack }) {
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+        <span style={{ fontSize: 22 }}>🃏</span>
+        <h1 style={{ ...PT, color: "#f15bb5" }}>Rummy Rules</h1>
+      </div>
+      <div style={{ background: "#fff0f8", border: "1px solid #fbcfe8", borderRadius: 14, padding: "11px 14px", marginBottom: 16, fontSize: 13, color: "#be185d" }}>
+        <strong>Indian Rummy</strong> (13-card variant). 2–6 players, 2 decks + 2 jokers.
+      </div>
+      <div style={{ fontWeight: 800, fontSize: 14, color: "#f15bb5", marginBottom: 10 }}>🃏 Valid Combinations</div>
+      <HandVisual title="Pure Sequence" cards={["7♠", "8♠", "9♠"]} color="#e63946" desc="3+ consecutive cards of same suit, NO joker. At least one pure sequence required to declare." />
+      <HandVisual title="Impure Sequence" cards={["4♥", "🃏", "6♥"]} color="#f15bb5" desc="3+ consecutive cards with a joker replacing a missing card." />
+      <HandVisual title="Set / Group" cards={["K♠", "K♥", "K♦"]} color="#9b5de5" desc="3–4 cards of same rank, different suits. Joker can substitute." />
+      <HandVisual title="Joker" cards={["🃏"]} color="#f4a261" desc="Printed joker OR randomly selected wild card. Can replace any card in impure sequence or set." />
+      <Card style={{ marginTop: 4 }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: "#f15bb5", marginBottom: 8 }}>▶️ How to Play</div>
+        <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>• Each player gets 13 cards; one open card starts discard pile<br />• On your turn: draw from closed deck or discard pile, then discard one card<br />• Goal: arrange all 13 cards into valid sequences/sets<br />• <strong>Must have:</strong> at least 2 sequences (one must be pure)<br />• First to arrange all cards and discard declares <strong>"Rummy!"</strong></p>
+      </Card>
+      <Card>
+        <div style={{ fontWeight: 800, fontSize: 14, color: "#f15bb5", marginBottom: 8 }}>🏆 Scoring</div>
+        <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>Winner scores 0. Losers count unmatched cards:<br />• A, K, Q, J, 10 = 10 pts each<br />• Other cards = face value<br />• Joker = 0 pts<br />• <strong>Drop before first draw</strong> = 20 pts penalty<br />• <strong>Middle drop</strong> = 40 pts penalty<br />• <strong>Wrong declare</strong> = 80 pts penalty<br />Player crossing target score is eliminated. Last player wins.</p>
+      </Card>
+    </div>
+  );
+}
+
+// Rummy setup (score-based like UNO)
+function RummySetup({ onBack, onStart }) {
+  const [d, setD] = useState(newRummyGame);
+  const [n, setN] = useState(3);
+  const setP = (i, v) => setD(g => { const p = [...g.players]; p[i] = v; return { ...g, players: p }; });
+  const adjustN = num => { setN(num); setD(g => { const p = [...g.players]; while (p.length < num) p.push(""); return { ...g, players: p.slice(0, num) }; }); };
+  const ok = d.players.slice(0, n).every(p => p.trim());
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: "#f15bb5", borderRadius: 8, padding: "3px 10px" }}>RUMMY</span>
+        <h1 style={PT}>New Game</h1>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Card><Lbl>Game Name <M>(optional)</M></Lbl><Inp value={d.name} placeholder="e.g. Family Rummy" onChange={v => setD(g => ({ ...g, name: v }))} /></Card>
+        <Card>
+          <Lbl>Players (2–6)</Lbl>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {[2, 3, 4, 5, 6].map(num => <button key={num} onClick={() => adjustN(num)} style={{ width: 36, height: 36, borderRadius: 10, border: n === num ? "2px solid #f15bb5" : "2px solid transparent", background: n === num ? "#fff0f8" : "#f2f2f2", color: n === num ? "#f15bb5" : "#555", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{num}</button>)}
+          </div>
+          {Array.from({ length: n }).map((_, i) => <div key={i} style={{ marginBottom: i < n - 1 ? 9 : 0 }}><Inp bold value={d.players[i] || ""} placeholder={`Player ${i + 1}`} onChange={v => setP(i, v)} /></div>)}
+        </Card>
+        <Card>
+          <Lbl>Elimination Score</Lbl>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[100, 200, 500].map(c => <button key={c} onClick={() => setD(g => ({ ...g, targetScore: c }))} style={{ flex: 1, padding: "10px 4px", borderRadius: 12, border: d.targetScore === c ? "2px solid #f15bb5" : "2px solid transparent", background: d.targetScore === c ? "#fff0f8" : "#f2f2f2", color: d.targetScore === c ? "#f15bb5" : "#555", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{c} pts</button>)}
+          </div>
+        </Card>
+        <Btn primary disabled={!ok} onClick={() => onStart({ ...d, players: d.players.slice(0, n), id: Date.now() })} style={{ background: "#f15bb5" }}>Start Game →</Btn>
+      </div>
+    </div>
+  );
+}
+
+function RummyGame({ game, onSubmit, onHistory, onRules, onEnd, onHome, showToast }) {
+  const p = game.players;
+  const COLORS = ["#4a7cfc", "#e63946", "#16a34a", "#f4a261", "#9b5de5", "#f15bb5"];
+  const scores = p.map((_, i) => game.rounds.reduce((a, r) => a + (r.scores?.[i] || 0), 0));
+  const [winner, setWinner] = useState(0);
+  const [pts, setPts] = useState(p.map(() => ""));
+  const [isDrop, setIsDrop] = useState(p.map(() => "none")); // "none" | "first" | "middle" | "wrong"
+  const rn = game.rounds.length + 1;
+
+  const dropPenalty = { none: null, first: 20, middle: 40, wrong: 80 };
+
+  const getScore = (i) => {
+    if (i === winner) return 0;
+    if (isDrop[i] !== "none") return dropPenalty[isDrop[i]];
+    return Number(pts[i]) || 0;
+  };
+
+  const canSubmit = p.every((_, i) => i === winner || isDrop[i] !== "none" || pts[i] !== "");
+
+  const submit = () => {
+    const roundScores = p.map((_, i) => getScore(i));
+    onSubmit({ winner, winnerName: p[winner], scores: roundScores, drops: [...isDrop], ts: new Date().toISOString() });
+    setPts(p.map(() => "")); setWinner(0); setIsDrop(p.map(() => "none"));
+  };
+
+  return (
+    <div>
+      <div style={{ padding: "48px 20px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          <button onClick={onHome} style={BK}>← Games</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: "#f15bb5", borderRadius: 6, padding: "2px 8px" }}>RUMMY</span>
+            <h1 style={{ ...PT, fontSize: 18, margin: 0 }}>{game.name || p.join(" · ")}</h1>
+          </div>
+          <p style={{ margin: "2px 0 0", color: "#bbb", fontSize: 12 }}>Round {rn} · Eliminate at {game.targetScore} pts</p>
+        </div>
+        <div style={{ display: "flex", gap: 6, paddingTop: 28 }}>
+          <Pill onClick={onRules}>📖 Rules</Pill>
+          <Pill onClick={onHistory}>History</Pill>
+        </div>
+      </div>
+      <div style={{ margin: "13px 20px 0", overflowX: "auto" }}>
+        <div style={{ display: "flex", gap: 8, minWidth: "max-content" }}>
+          {p.map((pl, i) => {
+            const sc = scores[i];
+            const pct = Math.min((sc / game.targetScore) * 100, 100);
+            return (
+              <div key={i} style={{ minWidth: 85, background: "white", borderRadius: 13, padding: "11px 8px", textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", border: sc >= game.targetScore ? "2px solid #e63946" : "2px solid transparent" }}>
+                <div style={{ fontSize: 10, color: COLORS[i % COLORS.length], fontWeight: 700, textTransform: "uppercase", marginBottom: 2 }}>{pl}</div>
+                <div style={{ fontSize: 24, fontWeight: 900, color: sc >= game.targetScore ? "#e63946" : "#111", lineHeight: 1 }}>{sc}</div>
+                <div style={{ height: 4, background: "#f0f0f0", borderRadius: 4, marginTop: 4, overflow: "hidden" }}>
+                  <div style={{ width: pct + "%", height: "100%", background: sc >= game.targetScore ? "#e63946" : "#f15bb5", transition: "width 0.4s" }} />
+                </div>
+                {sc >= game.targetScore && <div style={{ fontSize: 9, color: "#e63946", fontWeight: 700, marginTop: 2 }}>OUT</div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ padding: "13px 20px 40px", display: "flex", flexDirection: "column", gap: 13 }}>
+        <Card>
+          <Lbl>Winner (declared Rummy)</Lbl>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {p.map((pl, i) => <button key={i} onClick={() => setWinner(i)} style={{ padding: "9px 14px", borderRadius: 20, fontSize: 13, fontWeight: 700, cursor: "pointer", background: winner === i ? "#f15bb5" : "#f2f2f2", color: winner === i ? "white" : "#444", border: winner === i ? "2px solid #f15bb5" : "2px solid transparent" }}>{pl}</button>)}
+          </div>
+        </Card>
+        <Card>
+          <Lbl>Points / Drops for Other Players</Lbl>
+          {p.map((pl, i) => i === winner ? null : (
+            <div key={i} style={{ marginBottom: 12, background: "#f9f9f9", borderRadius: 12, padding: "10px 12px" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: COLORS[i % COLORS.length], marginBottom: 8 }}>{pl}</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: isDrop[i] === "none" ? 8 : 0 }}>
+                {[["none", "Points"], ["first", "Drop (20)"], ["middle", "Mid Drop (40)"], ["wrong", "Wrong (80)"]].map(([val, lbl]) => (
+                  <button key={val} onClick={() => { const x = [...isDrop]; x[i] = val; setIsDrop(x); }} style={{ padding: "7px 10px", borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: "pointer", background: isDrop[i] === val ? "#f15bb5" : "#f2f2f2", color: isDrop[i] === val ? "white" : "#555", border: isDrop[i] === val ? "2px solid #f15bb5" : "2px solid transparent" }}>{lbl}</button>
+                ))}
+              </div>
+              {isDrop[i] === "none" && (
+                <input type="number" min="0" value={pts[i]} onChange={e => { const x = [...pts]; x[i] = e.target.value; setPts(x); }}
+                  placeholder="Card points" style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e8e8e8", fontSize: 15, fontWeight: 700, outline: "none", textAlign: "center" }} />
+              )}
+            </div>
+          ))}
+        </Card>
+        <Btn primary disabled={!canSubmit} onClick={submit} style={{ background: "#f15bb5" }}>Record Round {rn}</Btn>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => { if (window.confirm("End game?")) onEnd(); }} style={SB}>🏁 End</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RummyHistory({ game, onBack }) {
+  const p = game.players;
+  const COLORS = ["#4a7cfc", "#e63946", "#16a34a", "#f4a261", "#9b5de5", "#f15bb5"];
+  let cum = p.map(() => 0);
+  const rows = game.rounds.map(r => { if (r.scores) cum = cum.map((c, i) => c + r.scores[i]); return { r, cum: [...cum] }; });
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <h1 style={PT}>Round History</h1>
+      <p style={{ margin: "2px 0 14px", color: "#999", fontSize: 13 }}>{game.rounds.length} rounds</p>
+      {[...rows].reverse().map(({ r, cum }, i) => {
+        const ri = game.rounds.length - i;
+        return (
+          <div key={i} style={{ background: "#f7f7f7", borderRadius: 14, padding: "12px 14px", marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: "#999", fontWeight: 600 }}>Rd {ri}</span>
+              <span style={{ fontSize: 11, color: "#f15bb5", fontWeight: 700 }}>🏆 {r.winnerName}</span>
+              {r.ts && <span style={{ fontSize: 10, color: "#ccc" }}>{fmt(r.ts)}</span>}
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {p.map((pl, j) => (
+                <div key={j} style={{ background: "white", borderRadius: 9, padding: "6px 10px", textAlign: "center", minWidth: 60 }}>
+                  <div style={{ fontSize: 10, color: COLORS[j % COLORS.length], fontWeight: 700 }}>{pl}</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: r.scores?.[j] === 0 ? "#16a34a" : "#e63946" }}>+{r.scores?.[j] ?? 0}</div>
+                  <div style={{ fontSize: 10, color: cum[j] >= game.targetScore ? "#e63946" : "#aaa" }}>∑{cum[j]}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 function Import({onBack,onImport}){
   const[raw,setRaw]=useState(""),[err,setErr]=useState("");
   const go=()=>{
