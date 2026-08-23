@@ -52,11 +52,11 @@ const fmtDay=ts=>{if(!ts)return"";return new Date(ts).toLocaleDateString(undefin
 
 // ── Game factories ─────────────────────────────────────────────────────────────
 const newCPGame=()=>({id:Date.now(),type:"cp",name:"",teams:[{name:"Team A",players:["",""]},{name:"Team B",players:["",""]}],rounds:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),finished:false});
-const newTTFGame=()=>({id:Date.now(),type:"ttf",name:"",players:["","",""],rounds:[],dealerIdx:0,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),finished:false});
+const newTTFGame=()=>({id:Date.now(),type:"ttf",name:"",players:["","",""],rounds:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),finished:false});
 // 3-2-5: 3 players, targets: player0=3, player1=2, player2=5 (dealer gets 5, caller gets 3 or 2)
 // We store targets per round as they can change based on who calls/deals
 const newCPRound=()=>({trump:null,tricks:["",""],shuffler:null});
-const newTTFRound=(dealerIdx=0)=>({trump:null,targets:ttfTargetsForDealer(dealerIdx),actual:["","",""],shuffler:null,dealerIdx});
+const newTTFRound=()=>({trump:null,targets:[2,5,3],actual:["","",""],shuffler:null,dealerIdx:null});
 
 // ── Score calculators ─────────────────────────────────────────────────────────
 const calcCPScores=rounds=>rounds.reduce((a,r)=>{
@@ -179,13 +179,7 @@ function App(){
 
   const upd=useCallback(p=>setGames(gs=>gs.map(g=>g.id===activeId?{...g,...p,updatedAt:new Date().toISOString()}:g)),[activeId,setGames]);
   const goCPGame=id=>{setActiveId(id);setCPRound(newCPRound());setScreen("cp:game")};
-  const goTTFGame=id=>{
-  setActiveId(id);
-  const g=games.find(x=>x.id===id);
-  const di=(g&&g.dealerIdx!=null)?g.dealerIdx:0;
-  setTTFRound(newTTFRound(di));
-  setScreen("ttf:game");
-};
+  const goTTFGame=id=>{setActiveId(id);setTTFRound(newTTFRound());setScreen("ttf:game")};
   const goGame=g=>{if(g.type==="cp")goCPGame(g.id);else goTTFGame(g.id)};
   const del=id=>{setGames(gs=>gs.filter(g=>g.id!==id));if(activeId===id){setActiveId(null);setScreen("home")}};
   const exp=()=>{
@@ -219,9 +213,9 @@ function App(){
       {/* 3-2-5 screens */}
       {screen==="ttf:setup"&&<TTFSetup onBack={()=>setScreen("home")} onStart={g=>{setGames(gs=>[...gs,g]);goTTFGame(g.id)}}/>}
       {screen==="ttf:game"&&game&&game.type==="ttf"&&<TTFGame game={game} scores={ttfScores} round={ttfRound} setRound={setTTFRound}
-        onSubmit={(nr,nextDealer)=>{
-          upd({rounds:[...game.rounds,nr],dealerIdx:nextDealer});
-          setTTFRound(newTTFRound(nextDealer));
+        onSubmit={nr=>{
+          upd({rounds:[...game.rounds,nr]});
+          setTTFRound(newTTFRound());
           showToast("Round "+(game.rounds.length+1)+" recorded!");
         }}
         onHistory={()=>setScreen("ttf:history")} onShare={()=>setScreen("ttf:share")} onDash={()=>{save("cg:dashback","ttf:game");setScreen("ttf:dash")}}
@@ -347,13 +341,10 @@ function CPSetup({onBack,onStart}){
             {[0,1].map(pi=><div key={pi} style={{marginBottom:pi===0?8:0}}><Inp value={d.teams[ti].players[pi]} placeholder={"Player "+(pi+1)} onChange={v=>st(ti,pi,v)}/></div>)}
           </Card>
         ))}
-        <Card>
-          <Lbl>Who deals first? <M>(shuffles first round)</M></Lbl>
-          <div style={{display:"flex",gap:8}}>
-            {[0,1,2].map(i=><button key={i} onClick={()=>setD(g=>({...g,dealerIdx:i}))} style={{flex:1,padding:"10px 6px",borderRadius:12,border:d.dealerIdx===i?"2px solid #16a34a":"2px solid transparent",background:d.dealerIdx===i?"#f0fff4":"#f7f7f7",fontWeight:700,fontSize:13,color:d.dealerIdx===i?"#16a34a":"#555",cursor:"pointer"}}>{d.players[i]||"Player "+(i+1)}</button>)}
-          </div>
-        </Card>
-        <Btn primary disabled={!ok} onClick={()=>onStart({...d,id:Date.now(),dealerIdx:d.dealerIdx||0})}>Start Game →</Btn>
+        <div style={{background:"#f0fff4",border:"1px solid #bbf7d0",borderRadius:14,padding:"10px 14px",fontSize:13,color:"#166534"}}>
+          💡 <strong>Dealer = Shuffler.</strong> Each round, pick who shuffles — their targets auto-set to 2. The next player gets 5, last gets 3.
+        </div>
+        <Btn primary disabled={!ok} onClick={()=>onStart({...d,id:Date.now()})}>Start Game →</Btn>
       </div>
     </div>
   );
@@ -630,7 +621,7 @@ function CPDashboard({game,scores,onBack,showToast}){
 // ── 3-2-5 SCREENS ────────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
 function TTFSetup({onBack,onStart}){
-  const[d,setD]=useState(()=>({...newTTFGame(),dealerIdx:0}));
+  const[d,setD]=useState(newTTFGame);
   const setP=(i,v)=>setD(g=>{const p=[...g.players];p[i]=v;return{...g,players:p}});
   const ok=d.players.every(p=>p.trim());
   return(
@@ -654,13 +645,10 @@ function TTFSetup({onBack,onStart}){
             </div>
           ))}
         </Card>
-        <Card>
-          <Lbl>Who deals first? <M>(shuffles first round)</M></Lbl>
-          <div style={{display:"flex",gap:8}}>
-            {[0,1,2].map(i=><button key={i} onClick={()=>setD(g=>({...g,dealerIdx:i}))} style={{flex:1,padding:"10px 6px",borderRadius:12,border:d.dealerIdx===i?"2px solid #16a34a":"2px solid transparent",background:d.dealerIdx===i?"#f0fff4":"#f7f7f7",fontWeight:700,fontSize:13,color:d.dealerIdx===i?"#16a34a":"#555",cursor:"pointer"}}>{d.players[i]||"Player "+(i+1)}</button>)}
-          </div>
-        </Card>
-        <Btn primary disabled={!ok} onClick={()=>onStart({...d,id:Date.now(),dealerIdx:d.dealerIdx||0})}>Start Game →</Btn>
+        <div style={{background:"#f0fff4",border:"1px solid #bbf7d0",borderRadius:14,padding:"10px 14px",fontSize:13,color:"#166534"}}>
+          💡 <strong>Dealer = Shuffler.</strong> Each round, pick who shuffles — their targets auto-set to 2. The next player gets 5, last gets 3.
+        </div>
+        <Btn primary disabled={!ok} onClick={()=>onStart({...d,id:Date.now()})}>Start Game →</Btn>
       </div>
     </div>
   );
@@ -668,14 +656,26 @@ function TTFSetup({onBack,onStart}){
 
 function TTFEditPlayers({players,onBack,onSave}){
   const[d,setD]=useState([...players]);
+  const move=(from,to)=>{const x=[...d];const tmp=x[from];x[from]=x[to];x[to]=tmp;setD(x);};
   return(
     <div style={{padding:"48px 20px 40px"}}>
       <button onClick={onBack} style={BK}>← Cancel</button>
-      <h1 style={PT}>Edit Players</h1>
-      <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:20}}>
-        <Card>
-          {[0,1,2].map(i=><div key={i} style={{marginBottom:i<2?10:0}}><Inp bold value={d[i]} placeholder={"Player "+(i+1)} onChange={v=>{const x=[...d];x[i]=v;setD(x)}}/></div>)}
-        </Card>
+      <h1 style={PT}>Edit Players & Seats</h1>
+      <p style={{color:"#888",fontSize:13,margin:"4px 0 18px"}}>Edit names or tap arrows to change seat order around the table.</p>
+      <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:4}}>
+        {[0,1,2].map(i=>(
+          <div key={i} style={{display:"flex",gap:8,alignItems:"center"}}>
+            <div style={{width:28,textAlign:"center",fontSize:13,color:"#888",fontWeight:700,flexShrink:0}}>#{i+1}</div>
+            <div style={{flex:1}}><Inp bold value={d[i]} placeholder={"Player "+(i+1)} onChange={v=>{const x=[...d];x[i]=v;setD(x)}}/></div>
+            <div style={{display:"flex",flexDirection:"column",gap:3,flexShrink:0}}>
+              {i>0&&<button onClick={()=>move(i,i-1)} style={{width:30,height:26,background:"#f2f2f2",border:"none",borderRadius:7,cursor:"pointer",fontSize:13}}>↑</button>}
+              {i<2&&<button onClick={()=>move(i,i+1)} style={{width:30,height:26,background:"#f2f2f2",border:"none",borderRadius:7,cursor:"pointer",fontSize:13}}>↓</button>}
+            </div>
+          </div>
+        ))}
+        <div style={{background:"#f0f5ff",borderRadius:12,padding:"10px 14px",fontSize:12,color:"#4a7cfc",marginTop:4}}>
+          💡 Seat order matters — dealer gets 2, next seat gets 5, last seat gets 3.
+        </div>
         <Btn primary onClick={()=>onSave(d)}>Save Changes</Btn>
       </div>
     </div>
@@ -694,10 +694,12 @@ function TTFGame({game,scores,round:r,setRound,onSubmit,onHistory,onShare,onDash
   const result=r.actual.every(a=>a!=="")?r.targets.map((t,i)=>Number(r.actual[i])-t):null;
   const[spk,setSpk]=useState(false);
   const doSpeak=()=>{if(!window.speechSynthesis){showToast("Not supported");return}if(spk){window.speechSynthesis.cancel();setSpk(false);return}setSpk(true);speak(ttfScoreSpeech(game,cumScores,lang),lang,()=>setSpk(false))};
-  const nextDealer=(r.dealerIdx+1)%3;
+  // Dealer = shuffler. When shuffler is picked, targets auto-rotate.
+  // dealerIdx = index of the shuffler in players array
+  const dealerIdx=r.shuffler!=null?game.players.indexOf(r.shuffler):-1;
   const submit=()=>{
     const res=r.targets.map((t,i)=>Number(r.actual[i])-t);
-    onSubmit({trump:r.trump,targets:[...r.targets],actual:r.actual.map(Number),result:res,shuffler:r.shuffler||null,dealerIdx:r.dealerIdx,ts:new Date().toISOString()},nextDealer);
+    onSubmit({trump:r.trump,targets:[...r.targets],actual:r.actual.map(Number),result:res,shuffler:r.shuffler||null,dealerIdx,ts:new Date().toISOString()});
   };
   const setTarget=(i,v)=>{const t=[...r.targets];t[i]=Number(v);setRound(c=>({...c,targets:t}))};
   const setActual=(i,v)=>{
@@ -728,8 +730,8 @@ function TTFGame({game,scores,round:r,setRound,onSubmit,onHistory,onShare,onDash
           </div>
           <p style={{margin:"2px 0 0",color:"#bbb",fontSize:12}}>Round {rn} · {fmt(game.updatedAt)}</p>
         </div>
-        <div style={{display:"flex",gap:6,paddingTop:28}}>
-          <Pill onClick={onEditPlayers}>✏️</Pill>
+        <div style={{display:"flex",gap:6,paddingTop:28,flexWrap:"wrap",justifyContent:"flex-end"}}>
+          <Pill onClick={onEditPlayers}>✏️ Players</Pill>
           <Pill onClick={onHistory}>History</Pill>
         </div>
       </div>
@@ -740,8 +742,8 @@ function TTFGame({game,scores,round:r,setRound,onSubmit,onHistory,onShare,onDash
             <div style={{fontSize:10,color:COLORS[i],textTransform:"uppercase",letterSpacing:0.5,fontWeight:700,marginBottom:2}}>{p[i]}</div>
             <div style={{fontSize:26,fontWeight:900,color:"#111",lineHeight:1}}>{cumScores[i]>=0?"+":""}{cumScores[i]}</div>
             <div style={{fontSize:10,color:"#bbb",marginTop:2}}>target {r.targets[i]}</div>
-            {r.dealerIdx===i&&<div style={{fontSize:9,color:"#856404",fontWeight:700}}>🃏 dealer</div>}
-            {(r.dealerIdx+1)%3===i&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⭐ caller</div>}
+            {dealerIdx===i&&<div style={{fontSize:9,color:"#856404",fontWeight:700}}>🃏 shuffler</div>}
+            {dealerIdx>=0&&(dealerIdx+1)%3===i&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⭐ caller</div>}
           </div>
         ))}
         <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0}}>
@@ -759,15 +761,20 @@ function TTFGame({game,scores,round:r,setRound,onSubmit,onHistory,onShare,onDash
         </Card>
         {/* Targets per round */}
         <Card>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><Lbl style={{margin:0}}>Targets <M>(total must be 10)</M></Lbl><div style={{fontSize:10,color:"#aaa"}}>rotates each round</div></div>
-          <div style={{display:"flex",gap:8,marginBottom:10}}>{[0,1,2].map(i=>{const isDealer=r.dealerIdx===i,isCaller=(r.dealerIdx+1)%3===i;return(<div key={i} style={{flex:1,textAlign:"center",padding:"6px 4px",background:isDealer?"#fff8e1":isCaller?"#f0fff4":"#f0f5ff",borderRadius:10}}><div style={{fontSize:10,fontWeight:700,color:isDealer?"#856404":isCaller?"#16a34a":"#4a7cfc"}}>{isDealer?"🃏 Dealer":isCaller?"⭐ Caller":"3️⃣"}</div><div style={{fontSize:11,color:COLORS[i],fontWeight:700,marginTop:1}}>{p[i]}</div><div style={{fontSize:13,fontWeight:900,color:"#111",marginTop:2}}>{r.targets[i]}</div></div>);})}</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><Lbl style={{margin:0}}>Targets <M>(total must be 10)</M></Lbl>{r.shuffler?<div style={{fontSize:10,color:"#16a34a",fontWeight:600}}>Auto-set ✓</div>:<div style={{fontSize:10,color:"#e63946"}}>Pick shuffler first ↑</div>}</div>
+          <div style={{display:"flex",gap:8,marginBottom:10}}>{[0,1,2].map(i=>{const isDealer=r.dealerIdx===i,isCaller=(r.dealerIdx+1)%3===i;return(<div key={i} style={{flex:1,textAlign:"center",padding:"6px 4px",background:isDealer?"#fff8e1":isCaller?"#f0fff4":"#f0f5ff",borderRadius:10}}><div style={{fontSize:10,fontWeight:700,color:isDealer?"#856404":isCaller?"#16a34a":"#4a7cfc"}}>{isDealer?"🃏 Shuffler (2)":isCaller?"⭐ Caller (5)":"3️⃣ (3)"}</div><div style={{fontSize:11,color:COLORS[i],fontWeight:700,marginTop:1}}>{p[i]}</div><div style={{fontSize:13,fontWeight:900,color:"#111",marginTop:2}}>{r.targets[i]}</div></div>);})}</div>
           <div style={{fontSize:11,color:"#888",marginBottom:6,textAlign:"center"}}>Adjust if needed:</div>
           <div style={{display:"flex",gap:10}}>{[0,1,2].map(i=>(<div key={i} style={{flex:1,textAlign:"center"}}><div style={{display:"flex",flexWrap:"wrap",gap:3,justifyContent:"center"}}>{[0,1,2,3,4,5,6,7,8,9,10].map(n=>{const sel=r.targets[i]===n;return<button key={n} onClick={()=>setTarget(i,n)} style={{width:28,height:28,borderRadius:7,fontSize:11,fontWeight:sel?800:500,background:sel?COLORS[i]:"#f2f2f2",color:sel?"white":"#444",border:sel?"2px solid "+COLORS[i]:"2px solid transparent",cursor:"pointer"}}>{n}</button>;})}</div></div>))}</div>
           {!targetsOk&&<div style={{marginTop:8,color:"#e63946",fontSize:12,textAlign:"center",fontWeight:600}}>⚠ Must total 10 (currently {r.targets.reduce((a,b)=>a+b,0)})</div>}
-          <div style={{marginTop:8,fontSize:11,color:"#888",textAlign:"center"}}>Next round dealer: <strong style={{color:COLORS[nextDealer]}}>{p[nextDealer]}</strong></div>
+
         </Card>
         {/* Shuffler */}
-        <ShufflerCard players={p} value={r.shuffler} onChange={v=>setRound(c=>({...c,shuffler:v}))} lang={lang}/>
+        <ShufflerCard players={p} value={r.shuffler} onChange={v=>{
+          // Dealer = shuffler. Auto-set targets based on who shuffled.
+          const di=v!=null?p.indexOf(v):-1;
+          const newTargets=di>=0?ttfTargetsForDealer(di):[...r.targets];
+          setRound(c=>({...c,shuffler:v,dealerIdx:di>=0?di:null,targets:newTargets}));
+        }} lang={lang}/>
         {/* Actual hands won */}
         <Card>
           <Lbl>Hands Won This Round <M>(must total 10)</M></Lbl>
