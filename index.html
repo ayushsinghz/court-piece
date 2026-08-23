@@ -31,6 +31,15 @@ const {useState,useEffect,useCallback,useRef}=React;
 const SUITS=["♠","♥","♦","♣"];
 const RED=new Set(["♥","♦"]);
 const COURT_BONUS=6;
+// 3-2-5 target rotation: dealer gets 2, next gets 5, last gets 3
+// dealerIdx = index of player who shuffled (0,1,2)
+function ttfTargetsForDealer(dealerIdx){
+  const t=[0,0,0];
+  t[dealerIdx]=2;
+  t[(dealerIdx+1)%3]=5;
+  t[(dealerIdx+2)%3]=3;
+  return t;
+}
 const GK="cg:games",AK="cg:active",LK="cg:lang";
 
 // ── Storage ───────────────────────────────────────────────────────────────────
@@ -43,11 +52,11 @@ const fmtDay=ts=>{if(!ts)return"";return new Date(ts).toLocaleDateString(undefin
 
 // ── Game factories ─────────────────────────────────────────────────────────────
 const newCPGame=()=>({id:Date.now(),type:"cp",name:"",teams:[{name:"Team A",players:["",""]},{name:"Team B",players:["",""]}],rounds:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),finished:false});
-const newTTFGame=()=>({id:Date.now(),type:"ttf",name:"",players:["","",""],rounds:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),finished:false});
+const newTTFGame=()=>({id:Date.now(),type:"ttf",name:"",players:["","",""],rounds:[],dealerIdx:0,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),finished:false});
 // 3-2-5: 3 players, targets: player0=3, player1=2, player2=5 (dealer gets 5, caller gets 3 or 2)
 // We store targets per round as they can change based on who calls/deals
 const newCPRound=()=>({trump:null,tricks:["",""],shuffler:null});
-const newTTFRound=()=>({trump:null,targets:[3,2,5],actual:["","",""],shuffler:null});
+const newTTFRound=(dealerIdx=0)=>({trump:null,targets:ttfTargetsForDealer(dealerIdx),actual:["","",""],shuffler:null,dealerIdx});
 
 // ── Score calculators ─────────────────────────────────────────────────────────
 const calcCPScores=rounds=>rounds.reduce((a,r)=>{
@@ -170,7 +179,13 @@ function App(){
 
   const upd=useCallback(p=>setGames(gs=>gs.map(g=>g.id===activeId?{...g,...p,updatedAt:new Date().toISOString()}:g)),[activeId,setGames]);
   const goCPGame=id=>{setActiveId(id);setCPRound(newCPRound());setScreen("cp:game")};
-  const goTTFGame=id=>{setActiveId(id);setTTFRound(newTTFRound());setScreen("ttf:game")};
+  const goTTFGame=id=>{
+  setActiveId(id);
+  const g=games.find(x=>x.id===id);
+  const di=(g&&g.dealerIdx!=null)?g.dealerIdx:0;
+  setTTFRound(newTTFRound(di));
+  setScreen("ttf:game");
+};
   const goGame=g=>{if(g.type==="cp")goCPGame(g.id);else goTTFGame(g.id)};
   const del=id=>{setGames(gs=>gs.filter(g=>g.id!==id));if(activeId===id){setActiveId(null);setScreen("home")}};
   const exp=()=>{
@@ -204,7 +219,11 @@ function App(){
       {/* 3-2-5 screens */}
       {screen==="ttf:setup"&&<TTFSetup onBack={()=>setScreen("home")} onStart={g=>{setGames(gs=>[...gs,g]);goTTFGame(g.id)}}/>}
       {screen==="ttf:game"&&game&&game.type==="ttf"&&<TTFGame game={game} scores={ttfScores} round={ttfRound} setRound={setTTFRound}
-        onSubmit={nr=>{upd({rounds:[...game.rounds,nr]});setTTFRound(newTTFRound());showToast("Round "+(game.rounds.length+1)+" recorded!");}}
+        onSubmit={(nr,nextDealer)=>{
+          upd({rounds:[...game.rounds,nr],dealerIdx:nextDealer});
+          setTTFRound(newTTFRound(nextDealer));
+          showToast("Round "+(game.rounds.length+1)+" recorded!");
+        }}
         onHistory={()=>setScreen("ttf:history")} onShare={()=>setScreen("ttf:share")} onDash={()=>{save("cg:dashback","ttf:game");setScreen("ttf:dash")}}
         onEnd={()=>{upd({finished:true});setScreen("home");showToast("Game saved!")}}
         onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang} onEditPlayers={()=>setScreen("ttf:editPlayers")}/>}
@@ -328,7 +347,13 @@ function CPSetup({onBack,onStart}){
             {[0,1].map(pi=><div key={pi} style={{marginBottom:pi===0?8:0}}><Inp value={d.teams[ti].players[pi]} placeholder={"Player "+(pi+1)} onChange={v=>st(ti,pi,v)}/></div>)}
           </Card>
         ))}
-        <Btn primary disabled={!ok} onClick={()=>onStart({...d,id:Date.now()})}>Start Game →</Btn>
+        <Card>
+          <Lbl>Who deals first? <M>(shuffles first round)</M></Lbl>
+          <div style={{display:"flex",gap:8}}>
+            {[0,1,2].map(i=><button key={i} onClick={()=>setD(g=>({...g,dealerIdx:i}))} style={{flex:1,padding:"10px 6px",borderRadius:12,border:d.dealerIdx===i?"2px solid #16a34a":"2px solid transparent",background:d.dealerIdx===i?"#f0fff4":"#f7f7f7",fontWeight:700,fontSize:13,color:d.dealerIdx===i?"#16a34a":"#555",cursor:"pointer"}}>{d.players[i]||"Player "+(i+1)}</button>)}
+          </div>
+        </Card>
+        <Btn primary disabled={!ok} onClick={()=>onStart({...d,id:Date.now(),dealerIdx:d.dealerIdx||0})}>Start Game →</Btn>
       </div>
     </div>
   );
@@ -605,7 +630,7 @@ function CPDashboard({game,scores,onBack,showToast}){
 // ── 3-2-5 SCREENS ────────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
 function TTFSetup({onBack,onStart}){
-  const[d,setD]=useState(newTTFGame);
+  const[d,setD]=useState(()=>({...newTTFGame(),dealerIdx:0}));
   const setP=(i,v)=>setD(g=>{const p=[...g.players];p[i]=v;return{...g,players:p}});
   const ok=d.players.every(p=>p.trim());
   return(
@@ -629,7 +654,13 @@ function TTFSetup({onBack,onStart}){
             </div>
           ))}
         </Card>
-        <Btn primary disabled={!ok} onClick={()=>onStart({...d,id:Date.now()})}>Start Game →</Btn>
+        <Card>
+          <Lbl>Who deals first? <M>(shuffles first round)</M></Lbl>
+          <div style={{display:"flex",gap:8}}>
+            {[0,1,2].map(i=><button key={i} onClick={()=>setD(g=>({...g,dealerIdx:i}))} style={{flex:1,padding:"10px 6px",borderRadius:12,border:d.dealerIdx===i?"2px solid #16a34a":"2px solid transparent",background:d.dealerIdx===i?"#f0fff4":"#f7f7f7",fontWeight:700,fontSize:13,color:d.dealerIdx===i?"#16a34a":"#555",cursor:"pointer"}}>{d.players[i]||"Player "+(i+1)}</button>)}
+          </div>
+        </Card>
+        <Btn primary disabled={!ok} onClick={()=>onStart({...d,id:Date.now(),dealerIdx:d.dealerIdx||0})}>Start Game →</Btn>
       </div>
     </div>
   );
@@ -663,12 +694,27 @@ function TTFGame({game,scores,round:r,setRound,onSubmit,onHistory,onShare,onDash
   const result=r.actual.every(a=>a!=="")?r.targets.map((t,i)=>Number(r.actual[i])-t):null;
   const[spk,setSpk]=useState(false);
   const doSpeak=()=>{if(!window.speechSynthesis){showToast("Not supported");return}if(spk){window.speechSynthesis.cancel();setSpk(false);return}setSpk(true);speak(ttfScoreSpeech(game,cumScores,lang),lang,()=>setSpk(false))};
+  const nextDealer=(r.dealerIdx+1)%3;
   const submit=()=>{
     const res=r.targets.map((t,i)=>Number(r.actual[i])-t);
-    onSubmit({trump:r.trump,targets:[...r.targets],actual:r.actual.map(Number),result:res,shuffler:r.shuffler||null,ts:new Date().toISOString()});
+    onSubmit({trump:r.trump,targets:[...r.targets],actual:r.actual.map(Number),result:res,shuffler:r.shuffler||null,dealerIdx:r.dealerIdx,ts:new Date().toISOString()},nextDealer);
   };
   const setTarget=(i,v)=>{const t=[...r.targets];t[i]=Number(v);setRound(c=>({...c,targets:t}))};
-  const setActual=(i,v)=>{const a=[...r.actual];a[i]=v;setRound(c=>({...c,actual:a}))};
+  const setActual=(i,v)=>{
+    const a=[...r.actual];
+    a[i]=v;
+    // Auto-fill 3rd player if 2 are set and sum allows it
+    const filled=a.filter(x=>x!=="").length;
+    if(filled>=2){
+      const sum=a.reduce((s,x)=>s+(x!==""?Number(x):0),0);
+      const emptyIdx=a.findIndex(x=>x==="");
+      if(emptyIdx!==-1){
+        const remaining=10-sum;
+        if(remaining>=0&&remaining<=10)a[emptyIdx]=String(remaining);
+      }
+    }
+    setRound(c=>({...c,actual:a}));
+  };
   const targetOpts=[0,1,2,3,4,5,6,7,8,9,10];
   const COLORS=["#4a7cfc","#e63946","#16a34a"];
   return(
@@ -694,6 +740,8 @@ function TTFGame({game,scores,round:r,setRound,onSubmit,onHistory,onShare,onDash
             <div style={{fontSize:10,color:COLORS[i],textTransform:"uppercase",letterSpacing:0.5,fontWeight:700,marginBottom:2}}>{p[i]}</div>
             <div style={{fontSize:26,fontWeight:900,color:"#111",lineHeight:1}}>{cumScores[i]>=0?"+":""}{cumScores[i]}</div>
             <div style={{fontSize:10,color:"#bbb",marginTop:2}}>target {r.targets[i]}</div>
+            {r.dealerIdx===i&&<div style={{fontSize:9,color:"#856404",fontWeight:700}}>🃏 dealer</div>}
+            {(r.dealerIdx+1)%3===i&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⭐ caller</div>}
           </div>
         ))}
         <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0}}>
@@ -711,18 +759,12 @@ function TTFGame({game,scores,round:r,setRound,onSubmit,onHistory,onShare,onDash
         </Card>
         {/* Targets per round */}
         <Card>
-          <Lbl>Targets This Round <M>(must total 10)</M></Lbl>
-          <div style={{display:"flex",gap:10}}>
-            {[0,1,2].map(i=>(
-              <div key={i} style={{flex:1,textAlign:"center"}}>
-                <div style={{fontSize:11,color:COLORS[i],fontWeight:700,marginBottom:6}}>{p[i]}</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:4,justifyContent:"center"}}>
-                  {[2,3,4,5,6,7].map(n=>{const sel=r.targets[i]===n;return<button key={n} onClick={()=>setTarget(i,n)} style={{width:32,height:32,borderRadius:8,fontSize:13,fontWeight:sel?800:500,background:sel?COLORS[i]:"#f2f2f2",color:sel?"white":"#444",border:sel?"2px solid "+COLORS[i]:"2px solid transparent",cursor:"pointer",transition:"all 0.1s"}}>{n}</button>;})}
-                </div>
-              </div>
-            ))}
-          </div>
-          {!targetsOk&&<div style={{marginTop:8,color:"#e63946",fontSize:12,textAlign:"center",fontWeight:600}}>⚠ Targets must total 10 (currently {r.targets.reduce((a,b)=>a+b,0)})</div>}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><Lbl style={{margin:0}}>Targets <M>(total must be 10)</M></Lbl><div style={{fontSize:10,color:"#aaa"}}>rotates each round</div></div>
+          <div style={{display:"flex",gap:8,marginBottom:10}}>{[0,1,2].map(i=>{const isDealer=r.dealerIdx===i,isCaller=(r.dealerIdx+1)%3===i;return(<div key={i} style={{flex:1,textAlign:"center",padding:"6px 4px",background:isDealer?"#fff8e1":isCaller?"#f0fff4":"#f0f5ff",borderRadius:10}}><div style={{fontSize:10,fontWeight:700,color:isDealer?"#856404":isCaller?"#16a34a":"#4a7cfc"}}>{isDealer?"🃏 Dealer":isCaller?"⭐ Caller":"3️⃣"}</div><div style={{fontSize:11,color:COLORS[i],fontWeight:700,marginTop:1}}>{p[i]}</div><div style={{fontSize:13,fontWeight:900,color:"#111",marginTop:2}}>{r.targets[i]}</div></div>);})}</div>
+          <div style={{fontSize:11,color:"#888",marginBottom:6,textAlign:"center"}}>Adjust if needed:</div>
+          <div style={{display:"flex",gap:10}}>{[0,1,2].map(i=>(<div key={i} style={{flex:1,textAlign:"center"}}><div style={{display:"flex",flexWrap:"wrap",gap:3,justifyContent:"center"}}>{[0,1,2,3,4,5,6,7,8,9,10].map(n=>{const sel=r.targets[i]===n;return<button key={n} onClick={()=>setTarget(i,n)} style={{width:28,height:28,borderRadius:7,fontSize:11,fontWeight:sel?800:500,background:sel?COLORS[i]:"#f2f2f2",color:sel?"white":"#444",border:sel?"2px solid "+COLORS[i]:"2px solid transparent",cursor:"pointer"}}>{n}</button>;})}</div></div>))}</div>
+          {!targetsOk&&<div style={{marginTop:8,color:"#e63946",fontSize:12,textAlign:"center",fontWeight:600}}>⚠ Must total 10 (currently {r.targets.reduce((a,b)=>a+b,0)})</div>}
+          <div style={{marginTop:8,fontSize:11,color:"#888",textAlign:"center"}}>Next round dealer: <strong style={{color:COLORS[nextDealer]}}>{p[nextDealer]}</strong></div>
         </Card>
         {/* Shuffler */}
         <ShufflerCard players={p} value={r.shuffler} onChange={v=>setRound(c=>({...c,shuffler:v}))} lang={lang}/>
@@ -962,7 +1004,23 @@ function TTFDashboard({game,scores,onBack,showToast}){
 // ══════════════════════════════════════════════════════════════════════════════
 function Import({onBack,onImport}){
   const[raw,setRaw]=useState(""),[err,setErr]=useState("");
-  const go=()=>{setErr("");try{const p=JSON.parse(raw.trim());if(!Array.isArray(p)){setErr("Must be a JSON array.");return}if(!p.every(g=>g.id&&Array.isArray(g.rounds))){setErr("Invalid format.");return}onImport(p)}catch{setErr("Cannot parse. Paste the full export text.")}};
+  const go=()=>{
+    setErr("");
+    try{
+      const p=JSON.parse(raw.trim());
+      if(!Array.isArray(p)){setErr("Must be a JSON array.");return}
+      if(!p.every(g=>g.id&&Array.isArray(g.rounds))){setErr("Invalid format.");return}
+      // Auto-detect type for old games that don't have a type field
+      const fixed=p.map(g=>{
+        if(g.type)return g;
+        // Old CP games have teams array; old TTF games have players array of length 3
+        if(g.teams&&Array.isArray(g.teams))return{...g,type:"cp"};
+        if(g.players&&Array.isArray(g.players)&&g.players.length===3)return{...g,type:"ttf"};
+        return{...g,type:"cp"}; // default fallback
+      });
+      onImport(fixed);
+    }catch(e){setErr("Cannot parse. Paste the full export text. Error: "+e.message)}
+  };
   return(
     <div style={{padding:"48px 20px 40px"}}>
       <button onClick={onBack} style={BK}>← Back</button>
