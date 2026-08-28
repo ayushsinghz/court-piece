@@ -95,7 +95,7 @@ function cpScoreSpeech(game,scores,lang){
   return n+"Current score. "+t[0].name+": "+scores[0]+" points. "+t[1].name+": "+scores[1]+" points. "+(lead===-1?"Scores are level.":t[lead].name+" leads by "+diff+(diff===1?" point.":" points."));
 }
 function courtSpeech(win,lose,lang){
-  if(lang==="hi")return"Takhta Palat! "+win+" ne court maar diya hai aur "+lose+" ki sharmnaak haar. Na Na Na Na Poo poo!";
+  if(lang==="hi")return"Takhta Palat! "+win+" ne court maar diya hai aur "+lose+" ki sharmnaak haar. Na na na na poo poo!";
   return win+" has won the court! Outstanding! "+lose+" is defeated!";
 }
 function ttfScoreSpeech(game,scores,lang){
@@ -241,6 +241,7 @@ function App(){
       {screen==="cp:history"&&game&&<CPHistory game={game} scores={cpScores} onBack={()=>setScreen("cp:game")} onShare={()=>setScreen("cp:share")} lang={lang}/>}
       {screen==="cp:share"&&game&&<CPShare game={game} scores={cpScores} onBack={()=>setScreen("cp:game")} showToast={showToast} lang={lang}/>}
       {screen==="cp:dash"&&game&&<CPDashboard game={game} scores={cpScores} onBack={()=>setScreen(load("cg:dashback")||"cp:game")} showToast={showToast}/>}
+      {screen==="cp:rules"&&<CPRules onBack={()=>setScreen("cp:game")}/>}
 
       {/* ── 3-2-5 ── */}
       {screen==="ttf:setup"&&<TTFSetup onBack={()=>setScreen("home")} onStart={g=>{setGames(gs=>[...gs,g]);setActiveId(g.id);setTTFRound(newTTFRound());setScreen("ttf:game")}}/>}
@@ -289,7 +290,7 @@ function App(){
       {screen==="tp:setup"&&<TPSetup onBack={()=>setScreen("home")}
         onStart={g=>{setGames(gs=>[...gs,g]);setActiveId(g.id);setScreen("tp:game")}}/>}
       {screen==="tp:game"&&game&&game.type==="tp"&&<TPGame game={game}
-        onSubmit={nr=>{upd({rounds:[...game.rounds,nr],dealerIdx:(nr.dealerIdx+1)%game.players.length});showToast("Hand "+(game.rounds.length+1)+" recorded!");}}
+        onSubmit={nr=>{upd({rounds:[...game.rounds,nr],dealerIdx:((nr.dealerIdx||0)+1)%game.players.length});showToast("Hand "+(game.rounds.length+1)+" recorded!");}}
         onHistory={()=>setScreen("tp:history")} onRules={()=>setScreen("tp:rules")}
         onShare={()=>setScreen("tp:share")} onDash={()=>setScreen("tp:dash")}
         onEditPlayers={()=>setScreen("tp:editPlayers")}
@@ -297,7 +298,7 @@ function App(){
         onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang}/>}
       {screen==="tp:history"&&game&&<TPHistory game={game} onBack={()=>setScreen("tp:game")} onShare={()=>setScreen("tp:share")} color="#9b5de5" label="TEEN PATTI"/>}
       {screen==="tp:rules"&&<TeenPattiRules onBack={()=>setScreen(game?"tp:game":"home")}/>}
-      {screen==="tp:share"&&game&&<GenericShare game={game} scores={game.players.map((_,i)=>game.chipStart+game.rounds.reduce((a,r)=>a+(r.deltas?.[i]||0),0))} onBack={()=>setScreen("tp:game")} showToast={showToast} label="Teen Patti" color="#9b5de5"/>}
+      {screen==="tp:share"&&game&&<GenericShare game={game} scores={game.players.map((_,i)=>Number(game.chipStart)+game.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||r.deltas?.[i]||0),0))} onBack={()=>setScreen("tp:game")} showToast={showToast} label="Teen Patti" color="#9b5de5"/>}
       {screen==="tp:editPlayers"&&game&&<GenericEditPlayers players={game.players} onBack={()=>setScreen("tp:game")} color="#9b5de5" label="Teen Patti" onSave={p=>{upd({players:p});setScreen("tp:game");showToast("Updated!");}}/>}
       {screen==="tp:dash"&&game&&<GenericDashboard game={game} onBack={()=>setScreen("tp:game")} showToast={showToast} label="Teen Patti" color="#9b5de5" getScores={g=>g.players.map((_,i)=>g.chipStart+g.rounds.reduce((a,r)=>a+(r.deltas?.[i]||0),0))} getPlayers={g=>g.players}/>}
 
@@ -305,7 +306,7 @@ function App(){
       {screen==="poker:setup"&&<PokerSetup onBack={()=>setScreen("home")}
         onStart={g=>{setGames(gs=>[...gs,g]);setActiveId(g.id);setScreen("poker:game")}}/>}
       {screen==="poker:game"&&game&&game.type==="poker"&&<PokerGame game={game}
-        onSubmit={nr=>{upd({rounds:[...game.rounds,nr],dealerIdx:(nr.dealerIdx+1)%game.players.length});showToast("Hand "+(game.rounds.length+1)+" recorded!");}}
+        onSubmit={nr=>{upd({rounds:[...game.rounds,nr],dealerIdx:((nr.dealerIdx||0)+1)%game.players.length});showToast("Hand "+(game.rounds.length+1)+" recorded!");}}
         onHistory={()=>setScreen("poker:history")} onRules={()=>setScreen("poker:rules")}
         onShare={()=>setScreen("poker:share")} onDash={()=>setScreen("poker:dash")}
         onEditPlayers={()=>setScreen("poker:editPlayers")}
@@ -313,9 +314,9 @@ function App(){
         onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang}/>}
       {screen==="poker:history"&&game&&<PokerHistory game={game} onBack={()=>setScreen("poker:game")} onShare={()=>setScreen("poker:share")}/>}
       {screen==="poker:rules"&&<PokerRules onBack={()=>setScreen(game?"poker:game":"home")}/>}
-      {screen==="poker:share"&&game&&<GenericShare game={game} scores={game.players.map((_,i)=>game.chipStart+game.rounds.reduce((a,r)=>a+(r.deltas?.[i]||0),0))} onBack={()=>setScreen("poker:game")} showToast={showToast} label="Poker" color="#2a9d8f"/>}
+      {screen==="poker:share"&&game&&<GenericShare game={game} scores={game.players.map((_,i)=>Number(game.chipStart)+game.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||r.deltas?.[i]||0),0))} onBack={()=>setScreen("poker:game")} showToast={showToast} label="Poker" color="#2a9d8f"/>}
       {screen==="poker:editPlayers"&&game&&<GenericEditPlayers players={game.players} onBack={()=>setScreen("poker:game")} color="#2a9d8f" label="Poker" onSave={p=>{upd({players:p});setScreen("poker:game");showToast("Updated!");}}/>}
-      {screen==="poker:dash"&&game&&<GenericDashboard game={game} onBack={()=>setScreen("poker:game")} showToast={showToast} label="Poker" color="#2a9d8f" getScores={g=>g.players.map((_,i)=>g.chipStart+g.rounds.reduce((a,r)=>a+(r.deltas?.[i]||0),0))} getPlayers={g=>g.players}/>}
+      {screen==="poker:dash"&&game&&<GenericDashboard game={game} onBack={()=>setScreen("poker:game")} showToast={showToast} label="Poker" color="#2a9d8f" getScores={g=>g.players.map((_,i)=>Number(g.chipStart)+g.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||r.deltas?.[i]||0),0))} getPlayers={g=>g.players}/>}
 
       {/* ── Rummy ── */}
       {screen==="rummy:setup"&&<RummySetup onBack={()=>setScreen("home")} onStart={g=>{setGames(gs=>[...gs,g]);setActiveId(g.id);setScreen("rummy:game")}}/>}
@@ -745,6 +746,7 @@ function CPGame({game,scores,round:r,setRound,onSubmit,onEditTeams,onHistory,onS
         </div>
         <div style={{display:"flex",gap:6,paddingTop:28}}>
           <Pill onClick={onEditTeams}>✏️</Pill>
+          <Pill onClick={()=>setScreen("cp:rules")}>📖</Pill>
           <Pill onClick={onHistory}>History</Pill>
         </div>
       </div>
@@ -796,6 +798,51 @@ function CPGame({game,scores,round:r,setRound,onSubmit,onEditTeams,onHistory,onS
         <div style={{display:"flex",gap:10}}>
           <button onClick={()=>{if(window.confirm("End game?"))onEnd()}} style={{...SB,flex:1}}>🏁 End Game</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function CPRules({onBack}){
+  return(
+    <div style={{padding:"48px 20px 40px"}}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20}}>
+        <span style={{fontSize:22}}>🃏</span><h1 style={{...PT,color:"#4a7cfc"}}>Court Piece Rules</h1>
+      </div>
+      <div style={{background:"#f0f5ff",border:"1px solid #c7d9ff",borderRadius:14,padding:"11px 14px",marginBottom:16,fontSize:13,color:"#1d4ed8",lineHeight:1.6}}>
+        <strong>Court Piece (Kot Piece / Rung).</strong> 4 players in 2 teams. Trick-taking game with a 52-card deck. Trump suit beats all others.
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <Card>
+          <div style={{fontWeight:800,fontSize:14,color:"#4a7cfc",marginBottom:8}}>🎯 Objective</div>
+          <p style={{fontSize:13,color:"#555",lineHeight:1.7}}>Win more tricks than the opposing team. Each round has 13 tricks. Win 7+ tricks to win the round (1 point). Win all 13 for a Court — 7 points!</p>
+        </Card>
+        <Card>
+          <div style={{fontWeight:800,fontSize:14,color:"#4a7cfc",marginBottom:8}}>🃏 Setup</div>
+          <p style={{fontSize:13,color:"#555",lineHeight:1.7}}>• 4 players, 2 fixed teams — partners sit opposite each other<br/>• Shuffle and deal all 52 cards (13 each)<br/>• One player (the shuffler/dealer) picks the trump suit after seeing their cards</p>
+        </Card>
+        <Card>
+          <div style={{fontWeight:800,fontSize:14,color:"#4a7cfc",marginBottom:8}}>▶️ Gameplay</div>
+          <p style={{fontSize:13,color:"#555",lineHeight:1.7}}>• Player left of dealer leads the first trick<br/>• Others must follow suit if possible<br/>• If you can't follow suit, play trump or any card<br/>• Highest card of led suit wins — unless trump is played<br/>• Highest trump wins the trick<br/>• Winner of each trick leads the next</p>
+        </Card>
+        <Card>
+          <div style={{fontWeight:800,fontSize:14,color:"#4a7cfc",marginBottom:8}}>👑 Court (Kot)</div>
+          <p style={{fontSize:13,color:"#555",lineHeight:1.7}}>Win all 13 tricks = Court! Score 7 points (1 + 6 bonus). The app announces: <em>"Takhta Palat! Na na na na poo poo!"</em></p>
+        </Card>
+        <Card>
+          <div style={{fontWeight:800,fontSize:14,color:"#4a7cfc",marginBottom:8}}>🏆 Scoring</div>
+          {[["Win 7–12 tricks","1 point"],["Win all 13 — Court!","7 points (1+6 bonus)"],["Lose","0 points"]].map(([l,v])=>(
+            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 10px",background:"#f9f9f9",borderRadius:9,marginBottom:5}}>
+              <span style={{fontSize:13,color:"#555"}}>{l}</span>
+              <span style={{fontSize:13,fontWeight:700,color:"#4a7cfc"}}>{v}</span>
+            </div>
+          ))}
+        </Card>
+        <Card>
+          <div style={{fontWeight:800,fontSize:14,color:"#4a7cfc",marginBottom:8}}>💡 Card Ranking</div>
+          <p style={{fontSize:13,color:"#555",lineHeight:1.7}}>High → Low: <strong>A K Q J 10 9 8 7 6 5 4 3 2</strong><br/>Trump cards beat all non-trump cards regardless of rank.</p>
+        </Card>
       </div>
     </div>
   );
@@ -1532,6 +1579,41 @@ function UNOGame({ game, onSubmit, onHistory, onShare, onRules, onEnd, onHome, s
   );
 }
 
+// ── Rules helper components ───────────────────────────────────────────────────
+function HandVisual({title,cards,desc,color}){
+  return(
+    <div style={{background:"#f9f9f9",borderRadius:14,padding:"12px 14px",marginBottom:10}}>
+      <div style={{fontWeight:700,fontSize:14,color:color||"#333",marginBottom:6}}>{title}</div>
+      <div style={{display:"flex",gap:5,marginBottom:6,flexWrap:"wrap"}}>
+        {cards.map((c,i)=>{
+          const isRed=c.includes("♥")||c.includes("♦");
+          return<div key={i} style={{background:"white",border:"1.5px solid #e8e8e8",borderRadius:8,padding:"6px 8px",fontSize:13,fontWeight:700,color:isRed?"#e63946":"#1a1a2e",minWidth:32,textAlign:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.08)"}}>{c}</div>;
+        })}
+      </div>
+      <div style={{fontSize:12,color:"#666",lineHeight:1.5}}>{desc}</div>
+    </div>
+  );
+}
+
+function Section({title,children}){
+  return(
+    <div style={{marginBottom:18}}>
+      <div style={{fontWeight:800,fontSize:15,color:"#e63946",marginBottom:8}}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function Row({label,val,color}){
+  return(
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 12px",background:"#f9f9f9",borderRadius:10,marginBottom:5}}>
+      <span style={{fontSize:13,color:"#333"}}>{label}</span>
+      <span style={{fontSize:13,fontWeight:700,color:color||"#333"}}>{val}</span>
+    </div>
+  );
+}
+
+
 function UNORules({ onBack }) {
   const Section = ({ title, children }) => (
     <div style={{ marginBottom: 18 }}>
@@ -1860,345 +1942,380 @@ function newTPHand(players, boot, dealerIdx) {
   };
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// ── TEEN PATTI — Interactive Engine ──────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+
+const TP_C = {Blind:"#9b5de5",Seen:"#4a7cfc",Chaal:"#16a34a",Raise:"#f4a261",Fold:"#e63946",Show:"#2a9d8f",Sideshow:"#f15bb5"};
+
+function makeTPHand(players, boot, dealerIdx) {
+  const di = Number(dealerIdx) || 0;
+  const b = Number(boot) || 2;
+  return {
+    pot: players.length * b,
+    stake: b,
+    dealerIdx: di,
+    actions: [],
+    status: "active",
+    winner: null,
+    pStatus: players.map(() => "blind"),
+    changes: players.map(() => -b),
+  };
+}
+
+// ── Score speech helpers ──────────────────────────────────────────────────────
+function unoScoreSpeech(game,lang){
+  const sc=calcUNOScores(game.rounds);const p=game.players;
+  const lo=sc.indexOf(Math.min(...sc));
+  if(lang==="hi")return"UNO score. "+p.map((pl,i)=>pl+": "+sc[i]+" point").join(". ")+". "+p[lo]+" aage hai.";
+  return"UNO scores. "+p.map((pl,i)=>pl+": "+sc[i]).join(", ")+". "+p[lo]+" is leading.";
+}
+function g28ScoreSpeech(game,lang){
+  const sc=calc28Scores(game.rounds);const t=game.teams;
+  const diff=Math.abs(sc[0]-sc[1]);const lead=sc[0]>sc[1]?0:sc[1]>sc[0]?1:-1;
+  if(lang==="hi")return"28 ka score. "+t[0].name+": "+sc[0]+". "+t[1].name+": "+sc[1]+"."+(lead===-1?" Barabar.": " "+t[lead].name+" "+diff+" aage.");
+  return"28 scores. "+t[0].name+": "+sc[0]+". "+t[1].name+": "+sc[1]+"."+(lead===-1?" Level.":" "+t[lead].name+" leads by "+diff+".");
+}
+function chipScoreSpeech(game,label,lang){
+  const p=game.players;
+  const chips=p.map((_,i)=>Number(game.chipStart)+game.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||r.deltas?.[i]||0),0));
+  const best=chips.indexOf(Math.max(...chips));
+  if(lang==="hi")return label+" ka score. "+p.map((pl,i)=>pl+": "+chips[i]+" chips").join(". ")+". "+p[best]+" aage hai.";
+  return label+" scores. "+p.map((pl,i)=>pl+": "+chips[i]+" chips").join(", ")+". "+p[best]+" is leading.";
+}
+function rummyScoreSpeech(game,lang){
+  const p=game.players;
+  const sc=p.map((_,i)=>game.rounds.reduce((a,r)=>a+(r.scores?.[i]||0),0));
+  const lo=sc.indexOf(Math.min(...sc));
+  if(lang==="hi")return"Rummy score. "+p.map((pl,i)=>pl+": "+sc[i]+" point").join(". ")+". "+p[lo]+" best position mein.";
+  return"Rummy scores. "+p.map((pl,i)=>pl+": "+sc[i]).join(", ")+". "+p[lo]+" is in the best position.";
+}
+
+
 function TPSetup({ onBack, onStart }) {
-  const [d, setD] = useState(() => ({ ...newTPGame(), players: ["", "", ""] }));
+  const [name, setName] = useState("");
+  const [players, setPlayers] = useState(["","","",""]);
   const [n, setN] = useState(3);
-  const setP = (i, v) => setD(g => { const p = [...g.players]; p[i] = v; return { ...g, players: p }; });
-  const adjustN = num => { setN(num); setD(g => { const p = [...g.players]; while (p.length < num) p.push(""); return { ...g, players: p.slice(0, num) }; }); };
-  const ok = d.players.slice(0, n).every(p => p.trim());
+  const [boot, setBoot] = useState(2);
+  const [chips, setChips] = useState(500);
+  const setP = (i,v) => { const p=[...players]; p[i]=v; setPlayers(p); };
+  const ok = players.slice(0,n).every(p=>p.trim()) && boot>0;
   return (
-    <div style={{ padding: "48px 20px 40px" }}>
+    <div style={{padding:"48px 20px 40px"}}>
       <button onClick={onBack} style={BK}>← Back</button>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: "#9b5de5", borderRadius: 8, padding: "3px 10px" }}>TEEN PATTI</span>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+        <span style={{fontSize:10,fontWeight:700,color:"white",background:"#9b5de5",borderRadius:8,padding:"3px 10px"}}>TEEN PATTI</span>
         <h1 style={PT}>New Game</h1>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <Card><Lbl>Game Name <M>(optional)</M></Lbl><Inp value={d.name} placeholder="e.g. Friday Night" onChange={v => setD(g => ({ ...g, name: v }))} /></Card>
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <Card><Lbl>Game Name <M>(optional)</M></Lbl><Inp value={name} placeholder="e.g. Friday Night" onChange={setName}/></Card>
         <Card>
           <Lbl>Players (3–6)</Lbl>
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            {[3, 4, 5, 6].map(num => <button key={num} onClick={() => adjustN(num)} style={{ width: 40, height: 40, borderRadius: 11, border: n === num ? "2px solid #9b5de5" : "2px solid transparent", background: n === num ? "#f5f0ff" : "#f2f2f2", color: n === num ? "#9b5de5" : "#555", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>{num}</button>)}
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            {[3,4,5,6].map(num=><button key={num} onClick={()=>setN(num)} style={{width:40,height:40,borderRadius:11,border:n===num?"2px solid #9b5de5":"2px solid transparent",background:n===num?"#f5f0ff":"#f2f2f2",color:n===num?"#9b5de5":"#555",fontWeight:700,fontSize:15,cursor:"pointer"}}>{num}</button>)}
           </div>
-          {Array.from({ length: n }).map((_, i) => <div key={i} style={{ marginBottom: i < n - 1 ? 9 : 0 }}><Inp bold value={d.players[i] || ""} placeholder={`Player ${i + 1}`} onChange={v => setP(i, v)} /></div>)}
+          {Array.from({length:n}).map((_,i)=><div key={i} style={{marginBottom:i<n-1?9:0}}><Inp bold value={players[i]||""} placeholder={"Player "+(i+1)} onChange={v=>setP(i,v)}/></div>)}
         </Card>
         <Card>
-          <Lbl>Boot Amount (Ante)</Lbl>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {[1, 2, 5, 10, 20, 50].map(c => <button key={c} onClick={() => setD(g => ({ ...g, chipStart: g.chipStart || 500, boot: c }))} style={{ flex: 1, minWidth: 44, padding: "10px 4px", borderRadius: 11, border: d.boot === c ? "2px solid #9b5de5" : "2px solid transparent", background: d.boot === c ? "#f5f0ff" : "#f2f2f2", color: d.boot === c ? "#9b5de5" : "#555", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{c}</button>)}
+          <Lbl>Boot (Ante)</Lbl>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {[1,2,5,10,20,50].map(c=><button key={c} onClick={()=>setBoot(c)} style={{flex:1,minWidth:44,padding:"10px 4px",borderRadius:11,border:boot===c?"2px solid #9b5de5":"2px solid transparent",background:boot===c?"#f5f0ff":"#f2f2f2",color:boot===c?"#9b5de5":"#555",fontWeight:700,fontSize:13,cursor:"pointer"}}>{c}</button>)}
           </div>
         </Card>
         <Card>
           <Lbl>Starting Chips</Lbl>
-          <div style={{ display: "flex", gap: 8 }}>
-            {[100, 200, 500, 1000].map(c => <button key={c} onClick={() => setD(g => ({ ...g, chipStart: c }))} style={{ flex: 1, padding: "10px 4px", borderRadius: 11, border: d.chipStart === c ? "2px solid #9b5de5" : "2px solid transparent", background: d.chipStart === c ? "#f5f0ff" : "#f2f2f2", color: d.chipStart === c ? "#9b5de5" : "#555", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{c}</button>)}
+          <div style={{display:"flex",gap:8}}>
+            {[100,200,500,1000].map(c=><button key={c} onClick={()=>setChips(c)} style={{flex:1,padding:"10px 4px",borderRadius:11,border:chips===c?"2px solid #9b5de5":"2px solid transparent",background:chips===c?"#f5f0ff":"#f2f2f2",color:chips===c?"#9b5de5":"#555",fontWeight:700,fontSize:13,cursor:"pointer"}}>{c}</button>)}
           </div>
         </Card>
-        <Btn primary disabled={!ok || !d.boot} onClick={() => onStart({ ...d, players: d.players.slice(0, n), id: Date.now(), boot: d.boot || 2, chipStart: d.chipStart || 500, dealerIdx: 0 })} style={{ background: "#9b5de5" }}>Start Game →</Btn>
+        <Btn primary disabled={!ok} onClick={()=>onStart({id:Date.now(),type:"tp",name,players:players.slice(0,n),boot,chipStart:chips,dealerIdx:0,rounds:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),finished:false})} style={{background:"#9b5de5"}}>Start Game →</Btn>
       </div>
     </div>
   );
 }
 
-function TPGame({ game, onSubmit, onHistory, onRules, onEnd, onHome, showToast, onShare, onDash, onEditPlayers, lang, setLang }) {
+function TPGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,onDash,onEditPlayers,lang,setLang}) {
   const p = game.players;
-  const COLORS = ["#4a7cfc", "#e63946", "#16a34a", "#f4a261", "#9b5de5", "#f15bb5"];
-  const chips = p.map((_, i) => game.chipStart + game.rounds.reduce((a, r) => a + (r.chipChanges?.[i] || 0), 0));
-  const boot = game.boot || 2;
-  const [hand, setHand] = useState(() => newTPHand(p, boot, game.dealerIdx || 0));
+  const boot = Number(game.boot) || 2;
+  const chipStart = Number(game.chipStart) || 500;
+  const PC = ["#4a7cfc","#e63946","#16a34a","#f4a261","#9b5de5","#f15bb5"];
+  const savedChips=p.map((_,i)=>chipStart+game.rounds.reduce((a,r)=>a+(r.changes?.[i]||0),0));
+
+  const initDealer = Number(game.dealerIdx)||0;
+  const [hand, setHand] = useState(null);
   const [customAmt, setCustomAmt] = useState("");
+  const [showWinner, setShowWinner] = useState(false);
 
-  const activePlayers = hand.playerStatus.filter(s => s !== "folded" && s !== "out").length;
-  const nextPlayerIdx = (() => {
-    // find next non-folded player after last action
-    if (hand.actions.length === 0) return (hand.dealerIdx + 1) % p.length;
-    const last = hand.actions[hand.actions.length - 1];
-    const lastIdx = p.indexOf(last.player);
-    for (let i = 1; i <= p.length; i++) {
-      const idx = (lastIdx + i) % p.length;
-      if (hand.playerStatus[idx] !== "folded" && hand.playerStatus[idx] !== "out") return idx;
+  // Always derive hand safely
+  const h = hand || makeTPHand(p, boot, initDealer);
+  const chips=savedChips.map((c,i)=>c+(h.changes[i]||0));
+
+  // Next active player index
+  const getNext = (hd) => {
+    if (hd.actions.length === 0) return (Number(hd.dealerIdx)+1) % p.length;
+    const last = hd.actions[hd.actions.length-1];
+    const li = p.indexOf(last.player);
+    for (let i=1; i<=p.length; i++) {
+      const idx = (li+i) % p.length;
+      if (hd.pStatus[idx] !== "folded" && hd.pStatus[idx] !== "out") return idx;
     }
-    return -1;
-  })();
+    return 0;
+  };
 
-  const currentPlayer = nextPlayerIdx >= 0 ? p[nextPlayerIdx] : null;
-  const isBlind = hand.playerStatus[nextPlayerIdx] === "blind";
-  const minBet = isBlind ? hand.currentStake : hand.currentStake * 2;
+  const ni = getNext(h);
+  const cur = p[ni] || p[0];
+  const isBlind = h.pStatus[ni] === "blind";
+  const minBet = isBlind ? h.stake : h.stake * 2;
+  const active = h.pStatus.filter(s=>s!=="folded"&&s!=="out").length;
 
   const doAction = (action, amount) => {
-    if (hand.status !== "active") return;
-    const newHand = { ...hand, actions: [...hand.actions, { player: currentPlayer, action, amount: amount || 0, ts: new Date().toISOString() }] };
-    const newStatus = [...hand.playerStatus];
-    const newChanges = [...hand.chipChanges];
-
-    if (action === "Fold") {
-      newStatus[nextPlayerIdx] = "folded";
-    } else if (action === "Seen") {
-      newStatus[nextPlayerIdx] = "seen";
-      newHand.pot += amount;
-      newChanges[nextPlayerIdx] -= amount;
-      newHand.currentStake = amount / 2;
-    } else if (action === "Blind") {
-      newHand.pot += amount;
-      newChanges[nextPlayerIdx] -= amount;
-      newHand.currentStake = amount;
-    } else if (action === "Chaal") {
-      newHand.pot += amount;
-      newChanges[nextPlayerIdx] -= amount;
-      newHand.currentStake = amount / 2;
-    } else if (action === "Raise") {
-      newHand.pot += amount;
-      newChanges[nextPlayerIdx] -= amount;
-      newHand.currentStake = amount / 2;
-    } else if (action === "Show" || action === "Sideshow") {
-      // Show ends the hand — winner selected next
-      newHand.status = "showdown";
+    const nh = JSON.parse(JSON.stringify(h));
+    nh.actions.push({player:cur, action, amount:amount||0, ts:new Date().toISOString()});
+    if (action==="Fold") {
+      nh.pStatus[ni] = "folded";
+    } else if (action==="Blind") {
+      nh.pot += amount; nh.changes[ni] -= amount; nh.stake = amount;
+    } else if (action==="Seen") {
+      nh.pStatus[ni] = "seen"; nh.pot += amount; nh.changes[ni] -= amount; nh.stake = Math.floor(amount/2);
+    } else if (action==="Chaal"||action==="Raise") {
+      nh.pot += amount; nh.changes[ni] -= amount; nh.stake = Math.floor(amount/2);
+    } else if (action==="Show"||action==="Sideshow") {
+      nh.status = "showdown";
     }
-
-    const remaining = newStatus.filter(s => s !== "folded" && s !== "out").length;
-    if (remaining === 1) {
-      const winnerIdx = newStatus.findIndex(s => s !== "folded" && s !== "out");
-      newHand.status = "finished";
-      newHand.winner = winnerIdx;
-      newChanges[winnerIdx] += newHand.pot;
+    const rem = nh.pStatus.filter(s=>s!=="folded"&&s!=="out").length;
+    if (rem===1) {
+      const wi = nh.pStatus.findIndex(s=>s!=="folded"&&s!=="out");
+      nh.changes[wi] += nh.pot;
+      nh.status = "finished";
+      nh.winner = wi;
     }
-    newHand.chipChanges = newChanges;
-    newHand.playerStatus = newStatus;
-    setHand(newHand);
+    setHand(nh);
+    if (nh.status==="showdown") setShowWinner(true);
   };
 
-  const finishHand = (winnerIdx) => {
-    const finalChanges = [...hand.chipChanges];
-    finalChanges[winnerIdx] += hand.pot;
-    const finished = { ...hand, status: "finished", winner: winnerIdx, chipChanges: finalChanges };
-    const nextDealer = (hand.dealerIdx + 1) % p.length;
-    onSubmit({ chipChanges: finished.chipChanges, pot: finished.pot, winner: winnerIdx, winnerName: p[winnerIdx], actions: finished.actions, dealerIdx: finished.dealerIdx, ts: finished.ts });
-    setHand(newTPHand(p, boot, nextDealer));
-    showToast("Hand recorded! " + p[winnerIdx] + " wins 🏆");
+  const finishHand = (wi) => {
+    const fc = [...h.changes];
+    if (h.status!=="finished") fc[wi] += h.pot;
+    const nextDi = (Number(h.dealerIdx)+1) % p.length;
+    onSubmit({changes:fc, pot:h.pot, winner:wi, winnerName:p[wi], actions:h.actions, dealerIdx:Number(h.dealerIdx), ts:new Date().toISOString()});
+    setHand(makeTPHand(p, boot, nextDi));
+    setShowWinner(false);
+    showToast("🏆 "+p[wi]+" wins "+h.pot+" chips!");
   };
 
-  const resetHand = () => setHand(newTPHand(p, boot, (hand.dealerIdx + 1) % p.length));
-
-  const spkText = chipScoreSpeech(game, "Teen Patti", lang || "en");
+  const spkText = chipScoreSpeech(game,"Teen Patti",lang||"en");
 
   return (
     <div>
-      <div style={{ padding: "48px 20px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div style={{ flex: 1 }}>
+      <div style={{padding:"48px 20px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div style={{flex:1}}>
           <button onClick={onHome} style={BK}>← Games</button>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: "#9b5de5", borderRadius: 6, padding: "2px 8px" }}>TP</span>
-            <h1 style={{ ...PT, fontSize: 18, margin: 0 }}>{game.name || p.join(" · ")}</h1>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+            <span style={{fontSize:10,fontWeight:700,color:"white",background:"#9b5de5",borderRadius:6,padding:"2px 8px"}}>TP</span>
+            <h1 style={{...PT,fontSize:18,margin:0}}>{game.name||p.join(" · ")}</h1>
           </div>
-          <p style={{ margin: "2px 0 0", color: "#bbb", fontSize: 12 }}>Hand {game.rounds.length + 1} · Boot: {boot} · Dealer: {p[hand.dealerIdx]}</p>
+          <p style={{margin:"2px 0 0",color:"#bbb",fontSize:12}}>Hand {game.rounds.length+1} · Boot:{boot} · Dealer:{p[Number(h.dealerIdx)||0]}</p>
         </div>
-        <div style={{ display: "flex", gap: 5, paddingTop: 28 }}>
+        <div style={{display:"flex",gap:5,paddingTop:28}}>
           <Pill onClick={onEditPlayers}>✏️</Pill>
           <Pill onClick={onRules}>📖</Pill>
-          <Pill onClick={onHistory}>History</Pill>
+          <Pill onClick={onHistory}>Hist</Pill>
         </div>
       </div>
 
       {/* Chip counts */}
-      <div style={{ margin: "12px 20px 0", overflowX: "auto" }}>
-        <div style={{ display: "flex", gap: 7, minWidth: "max-content" }}>
-          {p.map((pl, i) => (
-            <div key={i} style={{ minWidth: 80, background: hand.playerStatus[i] === "folded" ? "#f0f0f0" : "white", borderRadius: 13, padding: "10px 8px", textAlign: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.07)", opacity: hand.playerStatus[i] === "folded" ? 0.5 : 1, border: nextPlayerIdx === i && hand.status === "active" ? "2px solid " + COLORS[i % COLORS.length] : "2px solid transparent" }}>
-              <div style={{ fontSize: 9, color: COLORS[i % COLORS.length], fontWeight: 700, textTransform: "uppercase" }}>{pl}</div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: "#111", lineHeight: 1.1 }}>{chips[i]}</div>
-              <div style={{ fontSize: 9, color: "#aaa", marginTop: 2 }}>
-                {hand.playerStatus[i] === "folded" ? "FOLDED" : hand.playerStatus[i] === "blind" ? "BLIND" : hand.playerStatus[i] === "seen" ? "SEEN" : ""}
-              </div>
+      <div style={{margin:"12px 20px 0",overflowX:"auto"}}>
+        <div style={{display:"flex",gap:7,minWidth:"max-content"}}>
+          {p.map((pl,i)=>(
+            <div key={i} style={{minWidth:78,background:h.pStatus[i]==="folded"?"#f0f0f0":"white",borderRadius:13,padding:"9px 7px",textAlign:"center",boxShadow:"0 2px 6px rgba(0,0,0,0.07)",opacity:h.pStatus[i]==="folded"?0.5:1,border:ni===i&&h.status==="active"?"2px solid "+PC[i%PC.length]:"2px solid transparent"}}>
+              <div style={{fontSize:9,color:PC[i%PC.length],fontWeight:700,textTransform:"uppercase"}}>{pl}</div>
+              <div style={{fontSize:20,fontWeight:900,color:"#111"}}>{chips[i]}</div>
+              <div style={{fontSize:9,color:"#aaa",marginTop:1}}>{h.pStatus[i]==="folded"?"FOLD":h.pStatus[i]==="seen"?"SEEN":"BLIND"}</div>
             </div>
           ))}
         </div>
       </div>
 
       {/* Pot */}
-      <div style={{ margin: "10px 20px 0", background: "#fff8e1", borderRadius: 14, padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ fontSize: 13, color: "#856404", fontWeight: 600 }}>🪙 Pot</div>
-        <div style={{ fontSize: 24, fontWeight: 900, color: "#856404" }}>{hand.pot}</div>
-        <div style={{ fontSize: 12, color: "#aaa" }}>Stake: {hand.currentStake}</div>
+      <div style={{margin:"9px 20px 0",background:"#fff8e1",borderRadius:13,padding:"9px 15px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{fontSize:13,color:"#856404",fontWeight:600}}>🪙 Pot</span>
+        <span style={{fontSize:22,fontWeight:900,color:"#856404"}}>{h.pot}</span>
+        <span style={{fontSize:12,color:"#aaa"}}>Stake: {h.stake}</span>
       </div>
 
-      <div style={{ padding: "12px 20px 40px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{padding:"10px 20px 40px",display:"flex",flexDirection:"column",gap:11}}>
 
         {/* Action log */}
-        {hand.actions.length > 0 && (
+        {h.actions.length>0&&(
           <Card>
-            <Lbl>Hand Actions</Lbl>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 140, overflowY: "auto" }}>
-              {[...hand.actions].reverse().map((a, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 9px", background: "#f9f9f9", borderRadius: 9 }}>
-                  <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: COLORS[p.indexOf(a.player) % COLORS.length] }}>{a.player}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: TP_COLORS[a.action] || "#333", background: (TP_COLORS[a.action] || "#eee") + "22", borderRadius: 6, padding: "2px 7px" }}>{a.action}</span>
+            <Lbl>Actions</Lbl>
+            <div style={{maxHeight:120,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
+              {[...h.actions].reverse().map((a,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"4px 8px",background:"#f9f9f9",borderRadius:8}}>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <span style={{fontSize:11,fontWeight:700,color:PC[p.indexOf(a.player)%PC.length]}}>{a.player}</span>
+                    <span style={{fontSize:11,fontWeight:700,color:TP_C[a.action]||"#333",background:(TP_C[a.action]||"#eee")+"22",borderRadius:5,padding:"2px 6px"}}>{a.action}</span>
                   </div>
-                  {a.amount > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: "#e63946" }}>-{a.amount}</span>}
+                  {a.amount>0&&<span style={{fontSize:11,fontWeight:700,color:"#e63946"}}>-{a.amount}</span>}
                 </div>
               ))}
             </div>
           </Card>
         )}
 
-        {/* Current player action */}
-        {hand.status === "active" && currentPlayer && (
-          <Card style={{ border: "2px solid #9b5de5", background: "#f9f5ff" }}>
-            <div style={{ fontSize: 13, color: "#9b5de5", fontWeight: 700, marginBottom: 10 }}>
-              👤 {currentPlayer}'s turn · {isBlind ? "Playing Blind" : "Seen"} · Min bet: {minBet}
+        {/* Current player actions */}
+        {h.status==="active"&&!showWinner&&(
+          <Card style={{border:"2px solid #9b5de5",background:"#f9f5ff"}}>
+            <div style={{fontSize:13,color:"#9b5de5",fontWeight:700,marginBottom:10}}>
+              👤 {cur}'s turn · {isBlind?"Blind":"Seen"} · Min: {minBet}
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 10 }}>
-              {/* Contextual action buttons */}
-              {isBlind && (
-                <>
-                  <ActionBtn label="Blind" sub={"Pay " + minBet} color={TP_COLORS.Blind} onClick={() => doAction("Blind", minBet)} />
-                  <ActionBtn label="Seen" sub={"Pay " + minBet * 2} color={TP_COLORS.Seen} onClick={() => { doAction("Seen", minBet * 2); }} />
-                  <ActionBtn label="Fold" sub="Drop hand" color={TP_COLORS.Fold} onClick={() => doAction("Fold", 0)} />
-                </>
-              )}
-              {!isBlind && (
-                <>
-                  <ActionBtn label="Chaal" sub={"Pay " + minBet} color={TP_COLORS.Chaal} onClick={() => doAction("Chaal", minBet)} />
-                  <ActionBtn label="Raise" sub={"Pay " + minBet * 2} color={TP_COLORS.Raise} onClick={() => doAction("Raise", minBet * 2)} />
-                  <ActionBtn label="Fold" sub="Drop hand" color={TP_COLORS.Fold} onClick={() => doAction("Fold", 0)} />
-                  {activePlayers === 2 && <ActionBtn label="Show" sub="Showdown!" color={TP_COLORS.Show} onClick={() => doAction("Show", 0)} />}
-                  {activePlayers > 2 && <ActionBtn label="Sideshow" sub="Compare" color={TP_COLORS.Sideshow} onClick={() => doAction("Sideshow", 0)} />}
-                </>
-              )}
+            <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:10}}>
+              {isBlind&&<>
+                <ActionBtn label="Blind" sub={"Pay "+minBet} color={TP_C.Blind} onClick={()=>doAction("Blind",minBet)}/>
+                <ActionBtn label="See Cards" sub={"Pay "+(minBet*2)} color={TP_C.Seen} onClick={()=>doAction("Seen",minBet*2)}/>
+                <ActionBtn label="Fold" sub="Drop" color={TP_C.Fold} onClick={()=>doAction("Fold",0)}/>
+              </>}
+              {!isBlind&&<>
+                <ActionBtn label="Chaal" sub={"Pay "+minBet} color={TP_C.Chaal} onClick={()=>doAction("Chaal",minBet)}/>
+                <ActionBtn label="Raise" sub={"Pay "+(minBet*2)} color={TP_C.Raise} onClick={()=>doAction("Raise",minBet*2)}/>
+                <ActionBtn label="Fold" sub="Drop" color={TP_C.Fold} onClick={()=>doAction("Fold",0)}/>
+                {active===2&&<ActionBtn label="Show" sub="Showdown" color={TP_C.Show} onClick={()=>doAction("Show",0)}/>}
+                {active>2&&<ActionBtn label="Sideshow" sub="Compare" color={TP_C.Sideshow} onClick={()=>doAction("Sideshow",0)}/>}
+              </>}
             </div>
-            {/* Custom raise amount */}
-            {!isBlind && (
-              <div style={{ display: "flex", gap: 8 }}>
-                <input type="number" value={customAmt} onChange={e => setCustomAmt(e.target.value)} placeholder={"Custom amount (min " + minBet + ")"} style={{ flex: 1, padding: "9px 12px", borderRadius: 10, border: "1.5px solid #d8b4fe", fontSize: 13, outline: "none" }} />
-                <button onClick={() => { if (Number(customAmt) >= minBet) { doAction("Raise", Number(customAmt)); setCustomAmt(""); } else showToast("Min bet is " + minBet); }} style={{ padding: "9px 14px", borderRadius: 10, background: "#9b5de5", color: "white", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Raise</button>
+            {!isBlind&&(
+              <div style={{display:"flex",gap:8}}>
+                <input type="number" value={customAmt} onChange={e=>setCustomAmt(e.target.value)} placeholder={"Custom raise (min "+minBet+")"} style={{flex:1,padding:"8px 10px",borderRadius:9,border:"1.5px solid #d8b4fe",fontSize:13,outline:"none"}}/>
+                <button onClick={()=>{const v=Number(customAmt);if(v>=minBet){doAction("Raise",v);setCustomAmt("");}else showToast("Min: "+minBet);}} style={{padding:"8px 14px",borderRadius:9,background:"#9b5de5",color:"white",border:"none",fontWeight:700,fontSize:13,cursor:"pointer"}}>Raise</button>
               </div>
             )}
           </Card>
         )}
 
-        {/* Showdown — pick winner */}
-        {(hand.status === "showdown" || hand.status === "finished") && hand.winner === null && (
-          <Card style={{ border: "2px solid #2a9d8f", background: "#f0fdfa" }}>
-            <Lbl>🏆 Showdown — Pick Winner</Lbl>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {p.map((pl, i) => hand.playerStatus[i] !== "folded" ? (
-                <button key={i} onClick={() => finishHand(i)} style={{ flex: 1, padding: "12px 8px", borderRadius: 13, background: COLORS[i % COLORS.length], color: "white", border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{pl} wins</button>
-              ) : null)}
-            </div>
+        {/* Showdown / winner picker */}
+        {(h.status==="showdown"||showWinner||(h.status==="finished"&&h.winner!=null))&&(
+          <Card style={{border:"2px solid #16a34a",background:"#f0fff4"}}>
+            {h.status==="finished"&&h.winner!=null?(
+              <div>
+                <div style={{fontSize:15,fontWeight:800,color:"#16a34a",marginBottom:8}}>🏆 {p[h.winner]} wins {h.pot} chips!</div>
+                <Btn primary onClick={()=>finishHand(h.winner)} style={{background:"#16a34a"}}>✓ Record & Next Hand</Btn>
+              </div>
+            ):(
+              <div>
+                <Lbl>🏆 Pick Winner (Showdown)</Lbl>
+                <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:8}}>
+                  {p.map((pl,i)=>h.pStatus[i]!=="folded"?(
+                    <button key={i} onClick={()=>finishHand(i)} style={{flex:1,padding:"12px 8px",borderRadius:13,background:PC[i%PC.length],color:"white",border:"none",fontWeight:700,fontSize:14,cursor:"pointer"}}>{pl} wins</button>
+                  ):null)}
+                </div>
+              </div>
+            )}
           </Card>
         )}
 
-        {/* Hand finished */}
-        {hand.status === "finished" && hand.winner !== null && (
-          <Card style={{ border: "2px solid #16a34a", background: "#f0fff4" }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#16a34a", marginBottom: 6 }}>🏆 {p[hand.winner]} wins {hand.pot} chips!</div>
-            <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 10 }}>
-              {p.map((pl, i) => <div key={i} style={{ background: "white", borderRadius: 9, padding: "6px 10px", textAlign: "center" }}>
-                <div style={{ fontSize: 10, color: COLORS[i % COLORS.length], fontWeight: 700 }}>{pl}</div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: hand.chipChanges[i] > 0 ? "#16a34a" : "#e63946" }}>{hand.chipChanges[i] > 0 ? "+" : ""}{hand.chipChanges[i]}</div>
-              </div>)}
-            </div>
-            <Btn primary onClick={() => finishHand(hand.winner)} style={{ background: "#16a34a" }}>✓ Record & Next Hand</Btn>
-          </Card>
-        )}
-
-        <div style={{ display: "flex", gap: 8 }}>
-          <SpeakBtn text={spkText} lang={lang || "en"} size={46} />
-          <button onClick={() => setLang && setLang(lang === "en" ? "hi" : "en")} style={{ width: 46, height: 46, background: "#f2f2f2", border: "none", borderRadius: 13, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#555" }}>{lang === "en" ? "हिंदी" : "ENG"}</button>
-          <button onClick={onShare} style={{ ...SB, flex: 1 }}>📤 Share</button>
-          <button onClick={onDash} style={{ ...SB, flex: 1 }}>📊 Stats</button>
+        <div style={{display:"flex",gap:8}}>
+          <SpeakBtn text={spkText} lang={lang||"en"} size={46}/>
+          <button onClick={()=>setLang&&setLang(lang==="en"?"hi":"en")} style={{width:46,height:46,background:"#f2f2f2",border:"none",borderRadius:13,cursor:"pointer",fontSize:10,fontWeight:700,color:"#555"}}>{lang==="en"?"हिंदी":"ENG"}</button>
+          <button onClick={onShare} style={{...SB,flex:1}}>📤 Share</button>
+          <button onClick={onDash} style={{...SB,flex:1}}>📊 Stats</button>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={resetHand} style={{ ...SB, flex: 1, color: "#9b5de5" }}>↺ Reset Hand</button>
-          <button onClick={() => { if (window.confirm("End game?")) onEnd(); }} style={{ ...SB, flex: 1 }}>🏁 End Game</button>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>{setHand(makeTPHand(p,boot,(Number(h.dealerIdx)+1)%p.length));setShowWinner(false);}} style={{...SB,flex:1,color:"#9b5de5"}}>↺ New Hand</button>
+          <button onClick={()=>{if(window.confirm("End game?"))onEnd();}} style={{...SB,flex:1}}>🏁 End</button>
         </div>
       </div>
     </div>
   );
 }
 
-function ActionBtn({ label, sub, color, onClick }) {
-  return (
-    <button onClick={onClick} style={{ flex: 1, minWidth: 70, padding: "10px 6px", borderRadius: 12, background: color + "18", border: "2px solid " + color, color: color, fontWeight: 700, fontSize: 13, cursor: "pointer", textAlign: "center" }}>
+function ActionBtn({label,sub,color,onClick}){
+  return(
+    <button onClick={onClick} style={{flex:1,minWidth:70,padding:"9px 5px",borderRadius:11,background:color+"18",border:"2px solid "+color,color:color,fontWeight:700,fontSize:13,cursor:"pointer",textAlign:"center"}}>
       <div>{label}</div>
-      <div style={{ fontSize: 10, fontWeight: 500, opacity: 0.8 }}>{sub}</div>
+      <div style={{fontSize:10,fontWeight:500,opacity:0.8}}>{sub}</div>
     </button>
   );
 }
 
-function TPHistory({ game, onBack, onShare, color, label }) {
-  const p = game.players;
-  const COLORS = ["#4a7cfc", "#e63946", "#16a34a", "#f4a261", "#9b5de5", "#f15bb5"];
-  let chips = p.map(() => game.chipStart);
-  const rows = game.rounds.map(r => { if (r.chipChanges) chips = chips.map((c, i) => c + r.chipChanges[i]); return { r, chips: [...chips] }; });
-  return (
-    <div style={{ padding: "48px 20px 40px" }}>
+function TPHistory({game,onBack,onShare}){
+  const p=game.players;
+  const PC=["#4a7cfc","#e63946","#16a34a","#f4a261","#9b5de5","#f15bb5"];
+  const chipStart=Number(game.chipStart)||500;
+  let chips=p.map(()=>chipStart);
+  const rows=game.rounds.map(r=>{
+    const c=r.changes||r.chipChanges||r.deltas||[];
+    chips=chips.map((v,i)=>v+(c[i]||0));
+    return{r,chips:[...chips]};
+  });
+  return(
+    <div style={{padding:"48px 20px 40px"}}>
       <button onClick={onBack} style={BK}>← Back</button>
       <h1 style={PT}>Hand History</h1>
-      <p style={{ margin: "2px 0 14px", color: "#999", fontSize: 13 }}>{game.rounds.length} hands played</p>
-      {[...rows].reverse().map(({ r, chips }, i) => {
-        const ri = game.rounds.length - i;
-        return (
-          <div key={i} style={{ background: "#f7f7f7", borderRadius: 14, padding: "12px 14px", marginBottom: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: "#999", fontWeight: 600 }}>Hand {ri}</span>
-              <span style={{ fontSize: 11, color: "#9b5de5", fontWeight: 700 }}>🏆 {r.winnerName} (+{r.pot})</span>
-              {r.ts && <span style={{ fontSize: 10, color: "#ccc" }}>{fmt(r.ts)}</span>}
+      <p style={{margin:"2px 0 14px",color:"#999",fontSize:13}}>{game.rounds.length} hands</p>
+      {[...rows].reverse().map(({r,chips},i)=>{
+        const ri=game.rounds.length-i;
+        const c=r.changes||r.chipChanges||r.deltas||[];
+        return(
+          <div key={i} style={{background:"#f7f7f7",borderRadius:14,padding:"12px 14px",marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{fontSize:11,color:"#999",fontWeight:600}}>Hand {ri}</span>
+              <span style={{fontSize:11,color:"#9b5de5",fontWeight:700}}>🏆 {r.winnerName||""} (+{r.pot||0})</span>
+              {r.ts&&<span style={{fontSize:10,color:"#ccc"}}>{fmt(r.ts)}</span>}
             </div>
-            {r.actions && r.actions.length > 0 && (
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 7 }}>
-                {r.actions.map((a, j) => (
-                  <span key={j} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 6, background: (TP_COLORS[a.action] || "#eee") + "22", color: TP_COLORS[a.action] || "#888", fontWeight: 600 }}>{a.player.split(" ")[0]}:{a.action}{a.amount > 0 ? "(" + a.amount + ")" : ""}</span>
+            {r.actions&&r.actions.length>0&&(
+              <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:7}}>
+                {r.actions.map((a,j)=>(
+                  <span key={j} style={{fontSize:10,padding:"2px 5px",borderRadius:5,background:(TP_C[a.action]||"#eee")+"22",color:TP_C[a.action]||"#888",fontWeight:600}}>{(a.player||"").split(" ")[0]}:{a.action}{a.amount>0?"("+a.amount+")":""}</span>
                 ))}
               </div>
             )}
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {p.map((pl, j) => (
-                <div key={j} style={{ background: "white", borderRadius: 9, padding: "5px 9px", textAlign: "center", minWidth: 55 }}>
-                  <div style={{ fontSize: 9, color: COLORS[j % COLORS.length], fontWeight: 700 }}>{pl}</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: r.chipChanges?.[j] > 0 ? "#16a34a" : "#e63946" }}>{r.chipChanges?.[j] > 0 ? "+" : ""}{r.chipChanges?.[j] ?? 0}</div>
-                  <div style={{ fontSize: 10, color: "#aaa" }}>{chips[j]}</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {p.map((pl,j)=>(
+                <div key={j} style={{background:"white",borderRadius:9,padding:"5px 9px",textAlign:"center",minWidth:55}}>
+                  <div style={{fontSize:9,color:PC[j%PC.length],fontWeight:700}}>{pl}</div>
+                  <div style={{fontSize:12,fontWeight:700,color:(c[j]||0)>0?"#16a34a":"#e63946"}}>{(c[j]||0)>0?"+":""}{c[j]||0}</div>
+                  <div style={{fontSize:10,color:"#aaa"}}>{chips[j]}</div>
                 </div>
               ))}
             </div>
           </div>
         );
       })}
-      <div style={{ marginTop: 10 }}><Btn onClick={onShare}>Share Scorecard</Btn></div>
+      <div style={{marginTop:10}}><Btn onClick={onShare}>Share Scorecard</Btn></div>
     </div>
   );
 }
 
-function TeenPattiRules({ onBack }) {
-  return (
-    <div style={{ padding: "48px 20px 40px" }}>
+function TeenPattiRules({onBack}){
+  return(
+    <div style={{padding:"48px 20px 40px"}}>
       <button onClick={onBack} style={BK}>← Back</button>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-        <span style={{ fontSize: 22 }}>🃏</span><h1 style={{ ...PT, color: "#9b5de5" }}>Teen Patti Rules</h1>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20}}>
+        <span style={{fontSize:22}}>🃏</span><h1 style={{...PT,color:"#9b5de5"}}>Teen Patti Rules</h1>
       </div>
-      <div style={{ background: "#f5f0ff", border: "1px solid #d8b4fe", borderRadius: 14, padding: "11px 14px", marginBottom: 16, fontSize: 13, color: "#6d28d9", lineHeight: 1.6 }}>
-        <strong>Indian Poker / Flush.</strong> 3–6 players, 52-card deck, no jokers. Players bet on having the best 3-card hand.
+      <div style={{background:"#f5f0ff",border:"1px solid #d8b4fe",borderRadius:14,padding:"11px 14px",marginBottom:16,fontSize:13,color:"#6d28d9",lineHeight:1.6}}>
+        <strong>Indian Poker / Flush.</strong> 3–6 players, 52-card deck. Bet on having the best 3-card hand.
       </div>
-      <div style={{ fontWeight: 800, fontSize: 14, color: "#9b5de5", marginBottom: 10 }}>🏆 Hand Rankings (High → Low)</div>
-      <HandVisual title="Trail / Three of a Kind" cards={["A♠", "A♥", "A♦"]} color="#9b5de5" desc="Three cards of same rank. Three Aces highest, three 2s lowest." />
-      <HandVisual title="Pure Sequence (Straight Flush)" cards={["J♥", "Q♥", "K♥"]} color="#e63946" desc="Three consecutive same-suit cards. A-K-Q highest, A-2-3 lowest." />
-      <HandVisual title="Sequence (Straight/Run)" cards={["9♠", "10♥", "J♦"]} color="#f4a261" desc="Three consecutive cards, mixed suits." />
-      <HandVisual title="Colour (Flush)" cards={["3♠", "7♠", "K♠"]} color="#4a7cfc" desc="Three same-suit cards, not in sequence. Compare highest card first." />
-      <HandVisual title="Pair" cards={["8♦", "8♣", "K♠"]} color="#16a34a" desc="Two cards of same rank. Higher pair wins; equal pair, compare kicker." />
-      <HandVisual title="High Card" cards={["2♣", "5♥", "9♦"]} color="#888" desc="None of the above. Compare highest card, then second, then third." />
-      <Card style={{ marginTop: 8 }}>
-        <div style={{ fontWeight: 800, fontSize: 14, color: "#9b5de5", marginBottom: 8 }}>▶️ Actions</div>
-        {[["Blind", "#9b5de5", "Bet without seeing cards. Pay = current stake."],
-          ["Seen", "#4a7cfc", "Look at cards. Bet = 2x current stake minimum."],
-          ["Chaal", "#16a34a", "Match/continue bet (seen). Pay = 2x current stake."],
-          ["Raise", "#f4a261", "Increase the stake. Pay = 4x+ current stake."],
-          ["Fold", "#e63946", "Drop the hand. Lose chips bet so far."],
-          ["Show", "#2a9d8f", "Reveal cards (only 2 players left). Lower hand folds."],
-          ["Sideshow", "#f15bb5", "Compare privately with previous player (both seen). Loser folds."]
-        ].map(([a, c, d]) => (
-          <div key={a} style={{ display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid #f0f0f0" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: c, background: c + "18", borderRadius: 6, padding: "2px 8px", flexShrink: 0, alignSelf: "flex-start" }}>{a}</span>
-            <span style={{ fontSize: 12, color: "#555", lineHeight: 1.5 }}>{d}</span>
+      <div style={{fontWeight:800,fontSize:14,color:"#9b5de5",marginBottom:10}}>🏆 Hand Rankings (High → Low)</div>
+      <HandVisual title="Trail / Three of a Kind" cards={["A♠","A♥","A♦"]} color="#9b5de5" desc="Three cards of same rank. Three Aces highest."/>
+      <HandVisual title="Pure Sequence (Straight Flush)" cards={["J♥","Q♥","K♥"]} color="#e63946" desc="Three consecutive same-suit cards."/>
+      <HandVisual title="Sequence (Straight)" cards={["9♠","10♥","J♦"]} color="#f4a261" desc="Three consecutive cards, mixed suits."/>
+      <HandVisual title="Colour (Flush)" cards={["3♠","7♠","K♠"]} color="#4a7cfc" desc="Three same-suit cards, not in sequence."/>
+      <HandVisual title="Pair" cards={["8♦","8♣","K♠"]} color="#16a34a" desc="Two cards of same rank."/>
+      <HandVisual title="High Card" cards={["2♣","5♥","9♦"]} color="#888" desc="None of the above. Compare highest card."/>
+      <Card style={{marginTop:8}}>
+        <div style={{fontWeight:800,fontSize:14,color:"#9b5de5",marginBottom:8}}>▶️ Actions</div>
+        {[["Blind","#9b5de5","Bet without seeing cards. Pay = current stake."],
+          ["Seen","#4a7cfc","Look at cards first. Min bet = 2× current stake."],
+          ["Chaal","#16a34a","Match bet (after seeing cards). Pay = 2× stake."],
+          ["Raise","#f4a261","Increase stake. Pay more than Chaal amount."],
+          ["Fold","#e63946","Drop the hand. Lose chips bet so far."],
+          ["Show","#2a9d8f","Reveal cards — only 2 players left. Lower hand folds."],
+          ["Sideshow","#f15bb5","Compare privately with previous player (both seen). Loser folds."]
+        ].map(([a,c,d])=>(
+          <div key={a} style={{display:"flex",gap:10,padding:"7px 0",borderBottom:"1px solid #f0f0f0"}}>
+            <span style={{fontSize:11,fontWeight:700,color:c,background:c+"18",borderRadius:6,padding:"2px 8px",flexShrink:0,alignSelf:"flex-start"}}>{a}</span>
+            <span style={{fontSize:12,color:"#555",lineHeight:1.5}}>{d}</span>
           </div>
         ))}
       </Card>
@@ -2209,367 +2326,402 @@ function TeenPattiRules({ onBack }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // ── POKER — Interactive Texas Hold'em Engine ──────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
-const POKER_STREETS = ["Pre-Flop", "Flop", "Turn", "River"];
-const POKER_ACTIONS = { Fold: "#e63946", Check: "#888", Call: "#16a34a", Raise: "#4a7cfc", "All-In": "#9b5de5" };
 
-function newPokerHand(players, sb, bb, dealerIdx) {
-  const ante = bb;
-  const chipChanges = players.map((_, i) => {
-    if (i === (dealerIdx + 1) % players.length) return -sb;
-    if (i === (dealerIdx + 2) % players.length) return -bb;
-    return 0;
-  });
+const PK_STREETS = ["Pre-Flop","Flop","Turn","River"];
+const PK_AC = {Fold:"#e63946",Check:"#888",Call:"#16a34a",Raise:"#4a7cfc","All-In":"#9b5de5"};
+
+function makePokerHand(players, sb, bb, dealerIdx) {
+  const di = Number(dealerIdx)||0;
+  const n = players.length;
+  const sbIdx = (di+1)%n;
+  const bbIdx = (di+2)%n;
+  const changes = players.map((_,i)=>i===sbIdx?-Number(sb):i===bbIdx?-Number(bb):0);
+  const bets = players.map((_,i)=>i===sbIdx?Number(sb):i===bbIdx?Number(bb):0);
   return {
-    id: Date.now(), dealerIdx, sb, bb,
-    pot: sb + bb,
-    street: 0, // 0=pre-flop,1=flop,2=turn,3=river
-    currentBet: bb,
-    actions: [], streetActions: [[], [], [], []],
-    playerStatus: players.map(() => "active"), // active|folded|allin
-    playerBets: players.map((_, i) => {
-      if (i === (dealerIdx + 1) % players.length) return sb;
-      if (i === (dealerIdx + 2) % players.length) return bb;
-      return 0;
-    }),
-    chipChanges,
-    status: "active", winner: null,
-    ts: new Date().toISOString(),
+    dealerIdx:di, sb:Number(sb), bb:Number(bb),
+    pot:Number(sb)+Number(bb),
+    street:0,
+    currentBet:Number(bb),
+    actions:[], streetActions:[[],[],[],[]],
+    pStatus:players.map(()=>"active"),
+    pBets:bets,
+    changes,
+    status:"active",
+    winner:null,
   };
 }
 
-function PokerSetup({ onBack, onStart }) {
-  const [d, setD] = useState(() => ({ ...newPokerGame(), players: ["", "", ""] }));
-  const [n, setN] = useState(3);
-  const [sb, setSb] = useState(5);
-  const [bb, setBb] = useState(10);
-  const setP = (i, v) => setD(g => { const p = [...g.players]; p[i] = v; return { ...g, players: p }; });
-  const adjustN = num => { setN(num); setD(g => { const p = [...g.players]; while (p.length < num) p.push(""); return { ...g, players: p.slice(0, num) }; }); };
-  const ok = d.players.slice(0, n).every(p => p.trim());
-  return (
-    <div style={{ padding: "48px 20px 40px" }}>
+function PokerSetup({onBack,onStart}){
+  const [name,setName]=useState("");
+  const [players,setPlayers]=useState(["","","",""]);
+  const [n,setN]=useState(3);
+  const [sb,setSb]=useState(5);
+  const [bb,setBb]=useState(10);
+  const [chips,setChips]=useState(500);
+  const setP=(i,v)=>{const p=[...players];p[i]=v;setPlayers(p);};
+  const adjustN=num=>{setN(num);const p=[...players];while(p.length<num)p.push("");setPlayers(p.slice(0,num));};
+  const ok=players.slice(0,n).every(p=>p.trim());
+  return(
+    <div style={{padding:"48px 20px 40px"}}>
       <button onClick={onBack} style={BK}>← Back</button>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: "#2a9d8f", borderRadius: 8, padding: "3px 10px" }}>POKER</span>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+        <span style={{fontSize:10,fontWeight:700,color:"white",background:"#2a9d8f",borderRadius:8,padding:"3px 10px"}}>POKER</span>
         <h1 style={PT}>New Game</h1>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <Card><Lbl>Game Name <M>(optional)</M></Lbl><Inp value={d.name} placeholder="e.g. Home Game" onChange={v => setD(g => ({ ...g, name: v }))} /></Card>
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <Card><Lbl>Game Name <M>(optional)</M></Lbl><Inp value={name} placeholder="e.g. Home Game" onChange={setName}/></Card>
         <Card>
           <Lbl>Players (2–10)</Lbl>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-            {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => <button key={num} onClick={() => adjustN(num)} style={{ width: 36, height: 36, borderRadius: 10, border: n === num ? "2px solid #2a9d8f" : "2px solid transparent", background: n === num ? "#f0fdfa" : "#f2f2f2", color: n === num ? "#2a9d8f" : "#555", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{num}</button>)}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+            {[2,3,4,5,6,7,8,9,10].map(num=><button key={num} onClick={()=>adjustN(num)} style={{width:34,height:34,borderRadius:9,border:n===num?"2px solid #2a9d8f":"2px solid transparent",background:n===num?"#f0fdfa":"#f2f2f2",color:n===num?"#2a9d8f":"#555",fontWeight:700,fontSize:13,cursor:"pointer"}}>{num}</button>)}
           </div>
-          {Array.from({ length: n }).map((_, i) => <div key={i} style={{ marginBottom: i < n - 1 ? 9 : 0 }}><Inp bold value={d.players[i] || ""} placeholder={`Player ${i + 1}`} onChange={v => setP(i, v)} /></div>)}
+          {Array.from({length:n}).map((_,i)=><div key={i} style={{marginBottom:i<n-1?9:0}}><Inp bold value={players[i]||""} placeholder={"Player "+(i+1)} onChange={v=>setP(i,v)}/></div>)}
         </Card>
         <Card>
           <Lbl>Blinds</Lbl>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <div style={{ flex: 1 }}><div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>Small Blind</div>
-              <div style={{ display: "flex", gap: 5 }}>
-                {[1, 2, 5, 10, 25].map(v => <button key={v} onClick={() => setSb(v)} style={{ flex: 1, padding: "8px 2px", borderRadius: 9, border: sb === v ? "2px solid #2a9d8f" : "2px solid transparent", background: sb === v ? "#f0fdfa" : "#f2f2f2", color: sb === v ? "#2a9d8f" : "#555", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{v}</button>)}
-              </div>
+          <div style={{display:"flex",gap:10}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,color:"#888",marginBottom:4}}>Small Blind</div>
+              <div style={{display:"flex",gap:5}}>{[1,2,5,10,25].map(v=><button key={v} onClick={()=>setSb(v)} style={{flex:1,padding:"8px 2px",borderRadius:8,border:sb===v?"2px solid #2a9d8f":"2px solid transparent",background:sb===v?"#f0fdfa":"#f2f2f2",color:sb===v?"#2a9d8f":"#555",fontWeight:700,fontSize:12,cursor:"pointer"}}>{v}</button>)}</div>
             </div>
-            <div style={{ flex: 1 }}><div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>Big Blind</div>
-              <div style={{ display: "flex", gap: 5 }}>
-                {[2, 5, 10, 20, 50].map(v => <button key={v} onClick={() => setBb(v)} style={{ flex: 1, padding: "8px 2px", borderRadius: 9, border: bb === v ? "2px solid #2a9d8f" : "2px solid transparent", background: bb === v ? "#f0fdfa" : "#f2f2f2", color: bb === v ? "#2a9d8f" : "#555", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{v}</button>)}
-              </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,color:"#888",marginBottom:4}}>Big Blind</div>
+              <div style={{display:"flex",gap:5}}>{[2,5,10,20,50].map(v=><button key={v} onClick={()=>setBb(v)} style={{flex:1,padding:"8px 2px",borderRadius:8,border:bb===v?"2px solid #2a9d8f":"2px solid transparent",background:bb===v?"#f0fdfa":"#f2f2f2",color:bb===v?"#2a9d8f":"#555",fontWeight:700,fontSize:12,cursor:"pointer"}}>{v}</button>)}</div>
             </div>
           </div>
         </Card>
         <Card>
           <Lbl>Starting Chips</Lbl>
-          <div style={{ display: "flex", gap: 8 }}>
-            {[100, 200, 500, 1000, 2000].map(c => <button key={c} onClick={() => setD(g => ({ ...g, chipStart: c }))} style={{ flex: 1, padding: "9px 2px", borderRadius: 11, border: d.chipStart === c ? "2px solid #2a9d8f" : "2px solid transparent", background: d.chipStart === c ? "#f0fdfa" : "#f2f2f2", color: d.chipStart === c ? "#2a9d8f" : "#555", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{c}</button>)}
-          </div>
+          <div style={{display:"flex",gap:8}}>{[100,200,500,1000,2000].map(c=><button key={c} onClick={()=>setChips(c)} style={{flex:1,padding:"9px 2px",borderRadius:10,border:chips===c?"2px solid #2a9d8f":"2px solid transparent",background:chips===c?"#f0fdfa":"#f2f2f2",color:chips===c?"#2a9d8f":"#555",fontWeight:700,fontSize:12,cursor:"pointer"}}>{c}</button>)}</div>
         </Card>
-        <Btn primary disabled={!ok} onClick={() => onStart({ ...d, players: d.players.slice(0, n), id: Date.now(), sb, bb, chipStart: d.chipStart || 500, dealerIdx: 0 })} style={{ background: "#2a9d8f" }}>Start Game →</Btn>
+        <Btn primary disabled={!ok} onClick={()=>onStart({id:Date.now(),type:"poker",name,players:players.slice(0,n),sb,bb,chipStart:chips,dealerIdx:0,rounds:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),finished:false})} style={{background:"#2a9d8f"}}>Start Game →</Btn>
       </div>
     </div>
   );
 }
 
-function PokerGame({ game, onSubmit, onHistory, onRules, onEnd, onHome, showToast, onShare, onDash, onEditPlayers, lang, setLang }) {
-  const p = game.players;
-  const COLORS = ["#4a7cfc", "#e63946", "#16a34a", "#f4a261", "#9b5de5", "#f15bb5", "#00bbf9", "#fee440", "#06d6a0", "#fb8500"];
-  const chips = p.map((_, i) => game.chipStart + game.rounds.reduce((a, r) => a + (r.chipChanges?.[i] || 0), 0));
-  const sb = game.sb || 5, bb = game.bb || 10;
-  const [hand, setHand] = useState(() => newPokerHand(p, sb, bb, game.dealerIdx || 0));
-  const [customAmt, setCustomAmt] = useState("");
+function PokerGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,onDash,onEditPlayers,lang,setLang}){
+  const p=game.players;
+  const sb=Number(game.sb)||5;
+  const bb=Number(game.bb)||10;
+  const chipStart=Number(game.chipStart)||500;
+  const PC=["#4a7cfc","#e63946","#16a34a","#f4a261","#9b5de5","#f15bb5","#00bbf9","#fee440","#06d6a0","#fb8500"];
+  const savedChips=p.map((_,i)=>chipStart+game.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||0),0));
 
-  const activeCount = hand.playerStatus.filter(s => s === "active").length;
-  const streetName = POKER_STREETS[hand.street];
+  const initDi=Number(game.dealerIdx)||0;
+  const [hand,setHand]=useState(null);
+  const [custom,setCustom]=useState("");
 
-  // Next player to act (after BB pre-flop, left of dealer post-flop)
-  const nextPlayerIdx = (() => {
-    if (hand.status !== "active") return -1;
-    const streetActs = hand.streetActions[hand.street];
-    const lastActed = streetActs.length > 0 ? p.indexOf(streetActs[streetActs.length - 1].player) : -1;
-    for (let i = 1; i <= p.length; i++) {
-      const idx = (lastActed + i) % p.length;
-      if (hand.playerStatus[idx] === "active") return idx;
+  const h=hand||makePokerHand(p,sb,bb,initDi);
+  const chips=savedChips.map((c,i)=>c+(h.changes[i]||0));
+  const street=PK_STREETS[h.street]||"Pre-Flop";
+
+  // Find next active player
+  const getNext=(hd)=>{
+    const sa=hd.streetActions[hd.street]||[];
+    const li=sa.length>0?p.indexOf(sa[sa.length-1].player):-1;
+    const start=li>=0?li:(Number(hd.dealerIdx)+2)%p.length;
+    for(let i=1;i<=p.length;i++){
+      const idx=(start+i)%p.length;
+      if(hd.pStatus[idx]==="active")return idx;
     }
-    return -1;
-  })();
+    return 0;
+  };
 
-  const currentPlayer = nextPlayerIdx >= 0 ? p[nextPlayerIdx] : null;
-  const minRaise = hand.currentBet * 2;
-  const callAmt = hand.currentBet - (hand.playerBets[nextPlayerIdx] || 0);
+  const ni=getNext(h);
+  const cur=p[ni]||p[0];
+  const callAmt=Math.max(0,h.currentBet-(h.pBets[ni]||0));
+  const minRaise=h.currentBet*2||bb*2;
+  const active=h.pStatus.filter(s=>s==="active").length;
 
-  const doAction = (action, amount) => {
-    if (hand.status !== "active" || nextPlayerIdx < 0) return;
-    const newHand = JSON.parse(JSON.stringify(hand));
-    const act = { player: currentPlayer, action, amount: amount || 0, street: streetName, ts: new Date().toISOString() };
-    newHand.actions.push(act);
-    newHand.streetActions[newHand.street].push(act);
+  const doAction=(action,amount)=>{
+    const nh=JSON.parse(JSON.stringify(h));
+    const act={player:cur,action,amount:amount||0,street,ts:new Date().toISOString()};
+    nh.actions.push(act);
+    if(!nh.streetActions[nh.street])nh.streetActions[nh.street]=[];
+    nh.streetActions[nh.street].push(act);
 
-    if (action === "Fold") {
-      newHand.playerStatus[nextPlayerIdx] = "folded";
-    } else if (action === "Check") {
-      // no change
-    } else if (action === "Call") {
-      newHand.pot += callAmt;
-      newHand.chipChanges[nextPlayerIdx] -= callAmt;
-      newHand.playerBets[nextPlayerIdx] = hand.currentBet;
-    } else if (action === "Raise" || action === "All-In") {
-      const raise = amount || minRaise;
-      const extra = raise - (newHand.playerBets[nextPlayerIdx] || 0);
-      newHand.pot += extra;
-      newHand.chipChanges[nextPlayerIdx] -= extra;
-      newHand.playerBets[nextPlayerIdx] = raise;
-      newHand.currentBet = raise;
-      if (action === "All-In") newHand.playerStatus[nextPlayerIdx] = "allin";
+    if(action==="Fold"){
+      nh.pStatus[ni]="folded";
+    } else if(action==="Check"){
+      // no chip change
+    } else if(action==="Call"){
+      nh.pot+=callAmt; nh.changes[ni]-=callAmt; nh.pBets[ni]=h.currentBet;
+    } else if(action==="Raise"||action==="All-In"){
+      const raise=Number(amount)||minRaise;
+      const extra=raise-(nh.pBets[ni]||0);
+      nh.pot+=extra; nh.changes[ni]-=extra; nh.pBets[ni]=raise; nh.currentBet=raise;
+      if(action==="All-In")nh.pStatus[ni]="allin";
     }
 
-    // Check if street is over (all active players have acted and matched bet)
-    const remaining = newHand.playerStatus.filter(s => s === "active").length;
-    if (remaining <= 1) {
-      newHand.status = "showdown";
+    const rem=nh.pStatus.filter(s=>s==="active").length;
+    if(rem<=1){
+      nh.status="showdown";
     } else {
-      // Check if all active players have called the current bet
-      const allCalled = newHand.playerStatus.every((s, i) => s !== "active" || newHand.playerBets[i] >= newHand.currentBet);
-      const streetActed = newHand.streetActions[newHand.street].filter(a => a.action !== "Fold").length >= remaining;
-      if (allCalled && streetActed) {
-        if (newHand.street < 3) {
-          newHand.street++;
-          newHand.playerBets = p.map(() => 0);
-          newHand.currentBet = 0;
-          newHand.streetActions[newHand.street] = [];
+      const allCalled=nh.pStatus.every((s,i)=>s!=="active"||nh.pBets[i]>=nh.currentBet);
+      const actedCount=nh.streetActions[nh.street].filter(a=>a.action!=="Fold").length;
+      if(allCalled&&actedCount>=rem){
+        if(nh.street<3){
+          nh.street++;
+          nh.pBets=p.map(()=>0);
+          nh.currentBet=0;
+          if(!nh.streetActions[nh.street])nh.streetActions[nh.street]=[];
         } else {
-          newHand.status = "showdown";
+          nh.status="showdown";
         }
       }
     }
-    setHand(newHand);
+    setHand(nh);
   };
 
-  const finishHand = (winnerIdx) => {
-    const finalChanges = [...hand.chipChanges];
-    finalChanges[winnerIdx] += hand.pot;
-    const nextDealer = (hand.dealerIdx + 1) % p.length;
-    onSubmit({ chipChanges: finalChanges, pot: hand.pot, winner: winnerIdx, winnerName: p[winnerIdx], actions: hand.actions, dealerIdx: hand.dealerIdx, ts: hand.ts });
-    setHand(newPokerHand(p, sb, bb, nextDealer));
-    showToast("Hand recorded! " + p[winnerIdx] + " wins 🏆");
+  const finishHand=(wi)=>{
+    const fc=[...h.changes];
+    fc[wi]+=h.pot;
+    const nextDi=(Number(h.dealerIdx)+1)%p.length;
+    onSubmit({changes:fc,pot:h.pot,winner:wi,winnerName:p[wi],actions:h.actions,dealerIdx:Number(h.dealerIdx),ts:new Date().toISOString()});
+    setHand(makePokerHand(p,sb,bb,nextDi));
+    showToast("🏆 "+p[wi]+" wins "+h.pot+" chips!");
   };
 
-  const spkText = chipScoreSpeech(game, "Poker", lang || "en");
+  const advStreet=()=>{
+    if(h.street>=3)return;
+    const nh=JSON.parse(JSON.stringify(h));
+    nh.street++;
+    nh.pBets=p.map(()=>0);
+    nh.currentBet=0;
+    if(!nh.streetActions[nh.street])nh.streetActions[nh.street]=[];
+    setHand(nh);
+  };
 
-  return (
+  const spkText=chipScoreSpeech(game,"Poker",lang||"en");
+
+  return(
     <div>
-      <div style={{ padding: "48px 20px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div style={{ flex: 1 }}>
+      <div style={{padding:"48px 20px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div style={{flex:1}}>
           <button onClick={onHome} style={BK}>← Games</button>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: "#2a9d8f", borderRadius: 6, padding: "2px 8px" }}>POKER</span>
-            <h1 style={{ ...PT, fontSize: 18, margin: 0 }}>{game.name || p.join(" · ")}</h1>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+            <span style={{fontSize:10,fontWeight:700,color:"white",background:"#2a9d8f",borderRadius:6,padding:"2px 8px"}}>POKER</span>
+            <h1 style={{...PT,fontSize:18,margin:0}}>{game.name||p.join(" · ")}</h1>
           </div>
-          <p style={{ margin: "2px 0 0", color: "#bbb", fontSize: 12 }}>Hand {game.rounds.length + 1} · {streetName} · Dealer: {p[hand.dealerIdx]} · Blinds: {sb}/{bb}</p>
+          <p style={{margin:"2px 0 0",color:"#bbb",fontSize:12}}>Hand {game.rounds.length+1} · {street} · Dealer:{p[Number(h.dealerIdx)||0]} · {sb}/{bb}</p>
         </div>
-        <div style={{ display: "flex", gap: 5, paddingTop: 28 }}>
+        <div style={{display:"flex",gap:5,paddingTop:28}}>
           <Pill onClick={onEditPlayers}>✏️</Pill>
           <Pill onClick={onRules}>📖</Pill>
-          <Pill onClick={onHistory}>History</Pill>
+          <Pill onClick={onHistory}>Hist</Pill>
         </div>
       </div>
 
       {/* Chips */}
-      <div style={{ margin: "12px 20px 0", overflowX: "auto" }}>
-        <div style={{ display: "flex", gap: 7, minWidth: "max-content" }}>
-          {p.map((pl, i) => (
-            <div key={i} style={{ minWidth: 80, background: hand.playerStatus[i] === "folded" ? "#f0f0f0" : "white", borderRadius: 13, padding: "10px 7px", textAlign: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.07)", opacity: hand.playerStatus[i] === "folded" ? 0.5 : 1, border: nextPlayerIdx === i ? "2px solid " + COLORS[i % COLORS.length] : "2px solid transparent" }}>
-              <div style={{ fontSize: 9, color: COLORS[i % COLORS.length], fontWeight: 700, textTransform: "uppercase" }}>{pl}</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: "#111" }}>{chips[i]}</div>
-              <div style={{ fontSize: 9, color: "#aaa", marginTop: 1 }}>
-                {hand.playerStatus[i] === "folded" ? "FOLDED" : hand.playerStatus[i] === "allin" ? "ALL-IN" : i === (hand.dealerIdx + 1) % p.length ? "SB" : i === (hand.dealerIdx + 2) % p.length ? "BB" : ""}
+      <div style={{margin:"12px 20px 0",overflowX:"auto"}}>
+        <div style={{display:"flex",gap:7,minWidth:"max-content"}}>
+          {p.map((pl,i)=>(
+            <div key={i} style={{minWidth:78,background:h.pStatus[i]==="folded"?"#f0f0f0":"white",borderRadius:13,padding:"9px 7px",textAlign:"center",boxShadow:"0 2px 6px rgba(0,0,0,0.07)",opacity:h.pStatus[i]==="folded"?0.5:1,border:ni===i&&h.status==="active"?"2px solid "+PC[i%PC.length]:"2px solid transparent"}}>
+              <div style={{fontSize:9,color:PC[i%PC.length],fontWeight:700,textTransform:"uppercase"}}>{pl}</div>
+              <div style={{fontSize:20,fontWeight:900,color:"#111"}}>{chips[i]}</div>
+              <div style={{fontSize:9,color:"#aaa",marginTop:1}}>
+                {h.pStatus[i]==="folded"?"FOLD":h.pStatus[i]==="allin"?"ALL-IN":i===(Number(h.dealerIdx)+1)%p.length?"SB":i===(Number(h.dealerIdx)+2)%p.length?"BB":""}
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Street indicator + Pot */}
-      <div style={{ margin: "10px 20px 0", display: "flex", gap: 8 }}>
-        <div style={{ display: "flex", gap: 4, flex: 1 }}>
-          {POKER_STREETS.map((s, i) => (
-            <div key={s} style={{ flex: 1, textAlign: "center", padding: "6px 2px", borderRadius: 9, background: i === hand.street ? "#2a9d8f" : i < hand.street ? "#f0fdfa" : "#f2f2f2", color: i === hand.street ? "white" : i < hand.street ? "#2a9d8f" : "#aaa", fontSize: 10, fontWeight: 700 }}>{s}</div>
+      {/* Street + Pot */}
+      <div style={{margin:"9px 20px 0",display:"flex",gap:8}}>
+        <div style={{display:"flex",gap:4,flex:1}}>
+          {PK_STREETS.map((s,i)=>(
+            <div key={s} style={{flex:1,textAlign:"center",padding:"6px 2px",borderRadius:9,background:i===h.street?"#2a9d8f":i<h.street?"#f0fdfa":"#f2f2f2",color:i===h.street?"white":i<h.street?"#2a9d8f":"#aaa",fontSize:10,fontWeight:700}}>{s}</div>
           ))}
         </div>
-        <div style={{ background: "#fff8e1", borderRadius: 12, padding: "6px 12px", textAlign: "center", flexShrink: 0 }}>
-          <div style={{ fontSize: 9, color: "#856404" }}>POT</div>
-          <div style={{ fontSize: 18, fontWeight: 900, color: "#856404" }}>{hand.pot}</div>
+        <div style={{background:"#fff8e1",borderRadius:12,padding:"6px 12px",textAlign:"center",flexShrink:0}}>
+          <div style={{fontSize:9,color:"#856404"}}>POT</div>
+          <div style={{fontSize:18,fontWeight:900,color:"#856404"}}>{h.pot}</div>
         </div>
       </div>
 
-      <div style={{ padding: "10px 20px 40px", display: "flex", flexDirection: "column", gap: 11 }}>
+      <div style={{padding:"10px 20px 40px",display:"flex",flexDirection:"column",gap:11}}>
 
-        {/* Action log */}
-        {hand.actions.length > 0 && (
+        {/* Action log for current street */}
+        {(h.streetActions[h.street]||[]).length>0&&(
           <Card>
-            <Lbl>Actions — {streetName}</Lbl>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 130, overflowY: "auto" }}>
-              {hand.streetActions[hand.street].slice().reverse().map((a, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 8px", background: "#f9f9f9", borderRadius: 8 }}>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: COLORS[p.indexOf(a.player) % COLORS.length] }}>{a.player}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: POKER_ACTIONS[a.action] || "#333", background: (POKER_ACTIONS[a.action] || "#eee") + "22", borderRadius: 5, padding: "2px 6px" }}>{a.action}</span>
+            <Lbl>{street} Actions</Lbl>
+            <div style={{maxHeight:110,overflowY:"auto",display:"flex",flexDirection:"column",gap:3}}>
+              {[...(h.streetActions[h.street]||[])].reverse().map((a,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"4px 8px",background:"#f9f9f9",borderRadius:7}}>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <span style={{fontSize:11,fontWeight:700,color:PC[p.indexOf(a.player)%PC.length]}}>{a.player}</span>
+                    <span style={{fontSize:11,fontWeight:700,color:PK_AC[a.action]||"#333",background:(PK_AC[a.action]||"#eee")+"22",borderRadius:5,padding:"2px 5px"}}>{a.action}</span>
                   </div>
-                  {a.amount > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#e63946" }}>{a.amount}</span>}
+                  {a.amount>0&&<span style={{fontSize:11,fontWeight:700,color:"#e63946"}}>{a.amount}</span>}
                 </div>
               ))}
             </div>
           </Card>
         )}
 
-        {/* Current player action */}
-        {hand.status === "active" && currentPlayer && (
-          <Card style={{ border: "2px solid #2a9d8f", background: "#f0fdfa" }}>
-            <div style={{ fontSize: 13, color: "#2a9d8f", fontWeight: 700, marginBottom: 10 }}>
-              👤 {currentPlayer}'s turn · {streetName}
-              {hand.currentBet > 0 && ` · Call ${callAmt}`}
+        {/* Current player */}
+        {h.status==="active"&&(
+          <Card style={{border:"2px solid #2a9d8f",background:"#f0fdfa"}}>
+            <div style={{fontSize:13,color:"#2a9d8f",fontWeight:700,marginBottom:10}}>
+              👤 {cur}'s turn · {street}{callAmt>0?" · Call "+callAmt:""}
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 10 }}>
-              {hand.currentBet === 0 || callAmt === 0 ? (
-                <ActionBtn label="Check" sub="No bet" color={POKER_ACTIONS.Check} onClick={() => doAction("Check", 0)} />
-              ) : (
-                <ActionBtn label="Call" sub={String(callAmt)} color={POKER_ACTIONS.Call} onClick={() => doAction("Call", callAmt)} />
-              )}
-              <ActionBtn label="Raise" sub={"Min " + minRaise} color={POKER_ACTIONS.Raise} onClick={() => doAction("Raise", minRaise)} />
-              <ActionBtn label="All-In" sub={String(chips[nextPlayerIdx])} color={POKER_ACTIONS["All-In"]} onClick={() => doAction("All-In", chips[nextPlayerIdx])} />
-              <ActionBtn label="Fold" sub="Drop hand" color={POKER_ACTIONS.Fold} onClick={() => doAction("Fold", 0)} />
+            <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:10}}>
+              {(callAmt===0)?
+                <ActionBtn label="Check" sub="No bet" color={PK_AC.Check} onClick={()=>doAction("Check",0)}/>:
+                <ActionBtn label="Call" sub={String(callAmt)} color={PK_AC.Call} onClick={()=>doAction("Call",callAmt)}/>
+              }
+              <ActionBtn label="Raise" sub={"Min "+minRaise} color={PK_AC.Raise} onClick={()=>doAction("Raise",minRaise)}/>
+              <ActionBtn label="All-In" sub={String(chips[ni])} color={PK_AC["All-In"]} onClick={()=>doAction("All-In",chips[ni])}/>
+              <ActionBtn label="Fold" sub="Drop" color={PK_AC.Fold} onClick={()=>doAction("Fold",0)}/>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input type="number" value={customAmt} onChange={e => setCustomAmt(e.target.value)} placeholder={"Custom raise (min " + minRaise + ")"} style={{ flex: 1, padding: "8px 10px", borderRadius: 9, border: "1.5px solid #99f6e4", fontSize: 13, outline: "none" }} />
-              <button onClick={() => { if (Number(customAmt) >= minRaise) { doAction("Raise", Number(customAmt)); setCustomAmt(""); } else showToast("Min raise: " + minRaise); }} style={{ padding: "8px 14px", borderRadius: 9, background: "#2a9d8f", color: "white", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Raise</button>
+            <div style={{display:"flex",gap:8}}>
+              <input type="number" value={custom} onChange={e=>setCustom(e.target.value)} placeholder={"Raise amount (min "+minRaise+")"} style={{flex:1,padding:"8px 10px",borderRadius:9,border:"1.5px solid #99f6e4",fontSize:13,outline:"none"}}/>
+              <button onClick={()=>{const v=Number(custom);if(v>=minRaise){doAction("Raise",v);setCustom("");}else showToast("Min raise: "+minRaise);}} style={{padding:"8px 14px",borderRadius:9,background:"#2a9d8f",color:"white",border:"none",fontWeight:700,fontSize:13,cursor:"pointer"}}>Raise</button>
             </div>
           </Card>
         )}
 
-        {/* Advance street manually */}
-        {hand.status === "active" && hand.street < 3 && (
-          <button onClick={() => setHand(h => ({ ...h, street: h.street + 1, playerBets: p.map(() => 0), currentBet: 0, streetActions: h.streetActions.map((s, i) => i === h.street + 1 ? [] : s) }))}
-            style={{ background: "#f0fdfa", border: "1.5px solid #99f6e4", borderRadius: 13, padding: "10px", fontSize: 13, fontWeight: 600, color: "#2a9d8f", cursor: "pointer" }}>
-            → Deal {POKER_STREETS[hand.street + 1]}
+        {/* Deal next street */}
+        {h.status==="active"&&h.street<3&&(
+          <button onClick={advStreet} style={{background:"#f0fdfa",border:"1.5px solid #99f6e4",borderRadius:12,padding:"10px",fontSize:13,fontWeight:600,color:"#2a9d8f",cursor:"pointer"}}>
+            → Deal {PK_STREETS[h.street+1]}
           </button>
         )}
 
         {/* Showdown */}
-        {(hand.status === "showdown") && (
-          <Card style={{ border: "2px solid #2a9d8f", background: "#f0fdfa" }}>
+        {h.status==="showdown"&&(
+          <Card style={{border:"2px solid #2a9d8f",background:"#f0fdfa"}}>
             <Lbl>🏆 Showdown — Pick Winner</Lbl>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {p.map((pl, i) => hand.playerStatus[i] !== "folded" ? (
-                <button key={i} onClick={() => finishHand(i)} style={{ flex: 1, padding: "12px 8px", borderRadius: 13, background: COLORS[i % COLORS.length], color: "white", border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{pl} wins</button>
-              ) : null)}
+            <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:8}}>
+              {p.map((pl,i)=>h.pStatus[i]!=="folded"?(
+                <button key={i} onClick={()=>finishHand(i)} style={{flex:1,padding:"12px 8px",borderRadius:13,background:PC[i%PC.length],color:"white",border:"none",fontWeight:700,fontSize:14,cursor:"pointer"}}>{pl} wins</button>
+              ):null)}
             </div>
           </Card>
         )}
 
-        <div style={{ display: "flex", gap: 8 }}>
-          <SpeakBtn text={spkText} lang={lang || "en"} size={46} />
-          <button onClick={() => setLang && setLang(lang === "en" ? "hi" : "en")} style={{ width: 46, height: 46, background: "#f2f2f2", border: "none", borderRadius: 13, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#555" }}>{lang === "en" ? "हिंदी" : "ENG"}</button>
-          <button onClick={onShare} style={{ ...SB, flex: 1 }}>📤 Share</button>
-          <button onClick={onDash} style={{ ...SB, flex: 1 }}>📊 Stats</button>
+        <div style={{display:"flex",gap:8}}>
+          <SpeakBtn text={spkText} lang={lang||"en"} size={46}/>
+          <button onClick={()=>setLang&&setLang(lang==="en"?"hi":"en")} style={{width:46,height:46,background:"#f2f2f2",border:"none",borderRadius:13,cursor:"pointer",fontSize:10,fontWeight:700,color:"#555"}}>{lang==="en"?"हिंदी":"ENG"}</button>
+          <button onClick={onShare} style={{...SB,flex:1}}>📤 Share</button>
+          <button onClick={onDash} style={{...SB,flex:1}}>📊 Stats</button>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => setHand(newPokerHand(p, sb, bb, (hand.dealerIdx + 1) % p.length))} style={{ ...SB, flex: 1, color: "#2a9d8f" }}>↺ Reset Hand</button>
-          <button onClick={() => { if (window.confirm("End game?")) onEnd(); }} style={{ ...SB, flex: 1 }}>🏁 End Game</button>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>setHand(makePokerHand(p,sb,bb,(Number(h.dealerIdx)+1)%p.length))} style={{...SB,flex:1,color:"#2a9d8f"}}>↺ New Hand</button>
+          <button onClick={()=>{if(window.confirm("End game?"))onEnd();}} style={{...SB,flex:1}}>🏁 End</button>
         </div>
       </div>
     </div>
   );
 }
 
-function PokerHistory({ game, onBack, onShare }) {
-  const p = game.players;
-  const COLORS = ["#4a7cfc", "#e63946", "#16a34a", "#f4a261", "#9b5de5", "#f15bb5", "#00bbf9", "#fee440", "#06d6a0", "#fb8500"];
-  let chips = p.map(() => game.chipStart);
-  const rows = game.rounds.map(r => { if (r.chipChanges) chips = chips.map((c, i) => c + r.chipChanges[i]); return { r, chips: [...chips] }; });
-  return (
-    <div style={{ padding: "48px 20px 40px" }}>
+function PokerHistory({game,onBack,onShare}){
+  const p=game.players;
+  const PC=["#4a7cfc","#e63946","#16a34a","#f4a261","#9b5de5","#f15bb5","#00bbf9","#fee440","#06d6a0","#fb8500"];
+  const chipStart=Number(game.chipStart)||500;
+  let chips=p.map(()=>chipStart);
+  const rows=game.rounds.map(r=>{
+    const c=r.changes||r.chipChanges||r.deltas||[];
+    chips=chips.map((v,i)=>v+(c[i]||0));
+    return{r,chips:[...chips]};
+  });
+  return(
+    <div style={{padding:"48px 20px 40px"}}>
       <button onClick={onBack} style={BK}>← Back</button>
       <h1 style={PT}>Hand History</h1>
-      <p style={{ margin: "2px 0 14px", color: "#999", fontSize: 13 }}>{game.rounds.length} hands played</p>
-      {[...rows].reverse().map(({ r, chips }, i) => {
-        const ri = game.rounds.length - i;
-        return (
-          <div key={i} style={{ background: "#f7f7f7", borderRadius: 14, padding: "12px 14px", marginBottom: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: "#999", fontWeight: 600 }}>Hand {ri}</span>
-              <span style={{ fontSize: 11, color: "#2a9d8f", fontWeight: 700 }}>🏆 {r.winnerName} (+{r.pot})</span>
-              {r.ts && <span style={{ fontSize: 10, color: "#ccc" }}>{fmt(r.ts)}</span>}
+      <p style={{margin:"2px 0 14px",color:"#999",fontSize:13}}>{game.rounds.length} hands</p>
+      {[...rows].reverse().map(({r,chips},i)=>{
+        const ri=game.rounds.length-i;
+        const c=r.changes||r.chipChanges||r.deltas||[];
+        return(
+          <div key={i} style={{background:"#f7f7f7",borderRadius:14,padding:"12px 14px",marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{fontSize:11,color:"#999",fontWeight:600}}>Hand {ri}</span>
+              <span style={{fontSize:11,color:"#2a9d8f",fontWeight:700}}>🏆 {r.winnerName||""} (+{r.pot||0})</span>
+              {r.ts&&<span style={{fontSize:10,color:"#ccc"}}>{fmt(r.ts)}</span>}
             </div>
-            {r.actions && r.actions.length > 0 && (
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 7 }}>
-                {r.actions.slice(0, 8).map((a, j) => (
-                  <span key={j} style={{ fontSize: 10, padding: "2px 5px", borderRadius: 5, background: (POKER_ACTIONS[a.action] || "#eee") + "22", color: POKER_ACTIONS[a.action] || "#888", fontWeight: 600 }}>{a.player.split(" ")[0]}:{a.action}</span>
+            {r.actions&&r.actions.length>0&&(
+              <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:7}}>
+                {r.actions.slice(0,8).map((a,j)=>(
+                  <span key={j} style={{fontSize:10,padding:"2px 5px",borderRadius:5,background:(PK_AC[a.action]||"#eee")+"22",color:PK_AC[a.action]||"#888",fontWeight:600}}>{(a.player||"").split(" ")[0]}:{a.action}</span>
                 ))}
-                {r.actions.length > 8 && <span style={{ fontSize: 10, color: "#aaa" }}>+{r.actions.length - 8} more</span>}
+                {r.actions.length>8&&<span style={{fontSize:10,color:"#aaa"}}>+{r.actions.length-8}</span>}
               </div>
             )}
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {p.map((pl, j) => (
-                <div key={j} style={{ background: "white", borderRadius: 9, padding: "5px 9px", textAlign: "center", minWidth: 55 }}>
-                  <div style={{ fontSize: 9, color: COLORS[j % COLORS.length], fontWeight: 700 }}>{pl}</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: r.chipChanges?.[j] > 0 ? "#16a34a" : "#e63946" }}>{r.chipChanges?.[j] > 0 ? "+" : ""}{r.chipChanges?.[j] ?? 0}</div>
-                  <div style={{ fontSize: 10, color: "#aaa" }}>{chips[j]}</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {p.map((pl,j)=>(
+                <div key={j} style={{background:"white",borderRadius:9,padding:"5px 9px",textAlign:"center",minWidth:55}}>
+                  <div style={{fontSize:9,color:PC[j%PC.length],fontWeight:700}}>{pl}</div>
+                  <div style={{fontSize:12,fontWeight:700,color:(c[j]||0)>0?"#16a34a":"#e63946"}}>{(c[j]||0)>0?"+":""}{c[j]||0}</div>
+                  <div style={{fontSize:10,color:"#aaa"}}>{chips[j]}</div>
                 </div>
               ))}
             </div>
           </div>
         );
       })}
-      <div style={{ marginTop: 10 }}><Btn onClick={onShare}>Share Scorecard</Btn></div>
+      <div style={{marginTop:10}}><Btn onClick={onShare}>Share Scorecard</Btn></div>
     </div>
   );
 }
 
-function PokerRules({ onBack }) {
-  return (
-    <div style={{ padding: "48px 20px 40px" }}>
+function PokerRules({onBack}){
+  return(
+    <div style={{padding:"48px 20px 40px"}}>
       <button onClick={onBack} style={BK}>← Back</button>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-        <span style={{ fontSize: 22 }}>♠️</span><h1 style={{ ...PT, color: "#2a9d8f" }}>Poker — Texas Hold'em</h1>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20}}>
+        <span style={{fontSize:22}}>♠️</span><h1 style={{...PT,color:"#2a9d8f"}}>Texas Hold'em Rules</h1>
       </div>
-      <div style={{ background: "#f0fdfa", border: "1px solid #99f6e4", borderRadius: 14, padding: "11px 14px", marginBottom: 16, fontSize: 13, color: "#0f766e", lineHeight: 1.6 }}>
-        <strong>Texas Hold'em.</strong> Each player gets 2 private hole cards. 5 community cards dealt across 3 streets. Best 5-card hand wins.
+      <div style={{background:"#f0fdfa",border:"1px solid #99f6e4",borderRadius:14,padding:"11px 14px",marginBottom:16,fontSize:13,color:"#0f766e",lineHeight:1.6}}>
+        <strong>Texas Hold'em.</strong> Each player gets 2 hole cards. 5 community cards dealt across 3 streets. Best 5-card hand wins the pot.
       </div>
-      <div style={{ fontWeight: 800, fontSize: 14, color: "#2a9d8f", marginBottom: 10 }}>🏆 Hand Rankings (High → Low)</div>
-      <HandVisual title="Royal Flush" cards={["10♥", "J♥", "Q♥", "K♥", "A♥"]} color="#e63946" desc="A-K-Q-J-10 same suit. Unbeatable." />
-      <HandVisual title="Straight Flush" cards={["6♠", "7♠", "8♠", "9♠", "10♠"]} color="#9b5de5" desc="Five consecutive same-suit cards." />
-      <HandVisual title="Four of a Kind" cards={["K♠", "K♥", "K♦", "K♣", "3♠"]} color="#4a7cfc" desc="Four cards of the same rank." />
-      <HandVisual title="Full House" cards={["Q♠", "Q♥", "Q♦", "8♣", "8♥"]} color="#f4a261" desc="Three of a kind + a pair." />
-      <HandVisual title="Flush" cards={["2♥", "5♥", "8♥", "J♥", "A♥"]} color="#e63946" desc="Five same-suit cards." />
-      <HandVisual title="Straight" cards={["5♠", "6♥", "7♦", "8♣", "9♠"]} color="#16a34a" desc="Five consecutive cards, any suits." />
-      <HandVisual title="Three of a Kind" cards={["J♠", "J♥", "J♦", "4♣", "7♠"]} color="#2a9d8f" desc="Three cards of same rank." />
-      <HandVisual title="Two Pair" cards={["A♠", "A♥", "K♦", "K♣", "3♠"]} color="#888" desc="Two different pairs." />
-      <HandVisual title="One Pair" cards={["9♠", "9♥", "4♦", "7♣", "2♠"]} color="#aaa" desc="One pair of matching cards." />
-      <HandVisual title="High Card" cards={["2♣", "6♥", "9♦", "J♠", "A♣"]} color="#bbb" desc="Highest card when no other hand." />
-      <Card style={{ marginTop: 8 }}>
-        <div style={{ fontWeight: 800, fontSize: 14, color: "#2a9d8f", marginBottom: 8 }}>▶️ Game Flow</div>
-        <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>1. <strong>Blinds:</strong> SB + BB posted<br />2. <strong>Hole cards:</strong> 2 private cards each<br />3. <strong>Pre-Flop:</strong> Betting round<br />4. <strong>Flop:</strong> 3 community cards → bet<br />5. <strong>Turn:</strong> 4th card → bet<br />6. <strong>River:</strong> 5th card → final bet<br />7. <strong>Showdown:</strong> Best 5-card hand wins pot</p>
+      <div style={{fontWeight:800,fontSize:14,color:"#2a9d8f",marginBottom:10}}>🏆 Hand Rankings (High → Low)</div>
+      <HandVisual title="Royal Flush" cards={["10♥","J♥","Q♥","K♥","A♥"]} color="#e63946" desc="A-K-Q-J-10 of same suit. Unbeatable."/>
+      <HandVisual title="Straight Flush" cards={["6♠","7♠","8♠","9♠","10♠"]} color="#9b5de5" desc="Five consecutive same-suit cards."/>
+      <HandVisual title="Four of a Kind" cards={["K♠","K♥","K♦","K♣","3♠"]} color="#4a7cfc" desc="Four cards of the same rank."/>
+      <HandVisual title="Full House" cards={["Q♠","Q♥","Q♦","8♣","8♥"]} color="#f4a261" desc="Three of a kind + a pair."/>
+      <HandVisual title="Flush" cards={["2♥","5♥","8♥","J♥","A♥"]} color="#e63946" desc="Five cards of the same suit."/>
+      <HandVisual title="Straight" cards={["5♠","6♥","7♦","8♣","9♠"]} color="#16a34a" desc="Five consecutive, any suits."/>
+      <HandVisual title="Three of a Kind" cards={["J♠","J♥","J♦","4♣","7♠"]} color="#2a9d8f" desc="Three cards of same rank."/>
+      <HandVisual title="Two Pair" cards={["A♠","A♥","K♦","K♣","3♠"]} color="#888" desc="Two different pairs."/>
+      <HandVisual title="One Pair" cards={["9♠","9♥","4♦","7♣","2♠"]} color="#aaa" desc="One pair of matching cards."/>
+      <HandVisual title="High Card" cards={["2♣","6♥","9♦","J♠","A♣"]} color="#bbb" desc="Highest card when no other hand."/>
+      <Card style={{marginTop:8}}>
+        <div style={{fontWeight:800,fontSize:14,color:"#2a9d8f",marginBottom:8}}>▶️ Game Flow</div>
+        <p style={{fontSize:13,color:"#555",lineHeight:1.7}}>1. <strong>Blinds:</strong> SB + BB posted automatically<br/>2. <strong>Hole cards:</strong> 2 private cards dealt to each player<br/>3. <strong>Pre-Flop:</strong> First betting round<br/>4. <strong>Flop:</strong> 3 community cards → betting<br/>5. <strong>Turn:</strong> 4th card → betting<br/>6. <strong>River:</strong> 5th card → final betting<br/>7. <strong>Showdown:</strong> Best 5-card hand from 7 cards wins</p>
+      </Card>
+      <Card style={{marginTop:10}}>
+        <div style={{fontWeight:800,fontSize:14,color:"#2a9d8f",marginBottom:8}}>💰 Betting Actions</div>
+        {[
+          ["Check","#888","Pass your turn without betting. Only allowed when no one has bet yet in this street. If someone bets after you check, you must call, raise, or fold."],
+          ["Call","#16a34a","Match the current highest bet. Keeps you in the hand. Amount = current bet minus what you've already put in this street."],
+          ["Raise","#4a7cfc","Increase the bet. Minimum raise = 2× the current bet. Everyone else must call your raise, re-raise, or fold."],
+          ["All-In","#9b5de5","Bet all your remaining chips. You can still win the pot up to the amount you matched from each other player."],
+          ["Fold","#e63946","Discard your hand and forfeit the round. You lose any chips already bet. Use when your hand is weak."],
+        ].map(([a,c,d])=>(
+          <div key={a} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:"1px solid #f0f0f0"}}>
+            <span style={{fontSize:11,fontWeight:700,color:c,background:c+"18",borderRadius:6,padding:"3px 9px",flexShrink:0,alignSelf:"flex-start",minWidth:55,textAlign:"center"}}>{a}</span>
+            <span style={{fontSize:12,color:"#555",lineHeight:1.6}}>{d}</span>
+          </div>
+        ))}
+      </Card>
+      <Card style={{marginTop:10}}>
+        <div style={{fontWeight:800,fontSize:14,color:"#2a9d8f",marginBottom:8}}>🔢 Blinds & Betting Rules</div>
+        <p style={{fontSize:13,color:"#555",lineHeight:1.7}}>
+          • <strong>Small Blind (SB):</strong> Forced bet by player left of dealer<br/>
+          • <strong>Big Blind (BB):</strong> Forced bet = 2× SB by next player<br/>
+          • <strong>Pre-flop:</strong> BB player can check or raise if no one has raised<br/>
+          • <strong>Post-flop:</strong> Action starts left of dealer<br/>
+          • <strong>Minimum raise:</strong> At least equal to the previous raise size<br/>
+          • <strong>Street ends</strong> when all active players have matched the highest bet
+        </p>
       </Card>
     </div>
   );
 }
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ── RUMMY — Interactive 13-Card Engine ───────────────────────────────────────
