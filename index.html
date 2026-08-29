@@ -141,7 +141,7 @@ function StatBox({label,val,color,sub}){return<div style={{flex:1,background:"#f
 function WinBar({v0,v1,c0,c1}){const tot=v0+v1||1;return<div style={{height:8,borderRadius:8,background:"#eee",overflow:"hidden",display:"flex",marginTop:8}}><div style={{width:(v0/tot*100)+"%",background:c0||"#4a7cfc",transition:"width 0.5s"}}/><div style={{width:(v1/tot*100)+"%",background:c1||"#e63946",transition:"width 0.5s"}}/></div>}
 
 // ── Shuffler Card (shared) ────────────────────────────────────────────────────
-function ShufflerCard({players,value,onChange,lang}){
+function ShufflerCard({players,value,onChange,lang,required=false}){
   const[picked,setPicked]=useState(null);
   const[spin,setSpin]=useState(false);
   const validPlayers=players.filter(p=>p&&p.trim());
@@ -156,7 +156,7 @@ function ShufflerCard({players,value,onChange,lang}){
   return(
     <Card>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <Lbl style={{margin:0}}>Shuffler <M>(optional)</M></Lbl>
+        <Lbl style={{margin:0}}>Shuffler <M>{required?"(required)":"(optional)"}</M></Lbl>
         <button onClick={pick} disabled={spin} style={{background:spin?"#f0f0f0":"#f0f5ff",border:"1.5px solid #c7d9ff",borderRadius:20,padding:"5px 12px",fontSize:12,fontWeight:700,color:spin?"#aaa":"#4a7cfc",cursor:spin?"not-allowed":"pointer"}}>
           {spin?"🎲 Picking…":"🎲 Random"}
         </button>
@@ -194,6 +194,12 @@ function App(){
   const ttfScores=game&&game.type==="ttf"?calcTTFScores(game.rounds):[0,0,0];
 
   const upd=useCallback(p=>setGames(gs=>gs.map(g=>g.id===activeId?{...g,...p,updatedAt:new Date().toISOString()}:g)),[activeId,setGames]);
+  const undoLastRound=useCallback(()=>{
+    if(!game||game.rounds.length===0){showToast("Nothing to undo");return;}
+    if(!window.confirm("Undo last round/hand?"))return;
+    upd({rounds:game.rounds.slice(0,-1)});
+    showToast("Last round undone ↩");
+  },[game,upd,showToast]);
 
   const goGame=g=>{
     setActiveId(g.id);
@@ -236,7 +242,7 @@ function App(){
         onEditTeams={()=>setScreen("cp:editTeams")} onHistory={()=>setScreen("cp:history")}
         onShare={()=>setScreen("cp:share")} onDash={()=>{save("cg:dashback","cp:game");setScreen("cp:dash")}}
         onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
-        onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang} setScreen={setScreen}/>}
+        onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang} setScreen={setScreen} onUndo={undoLastRound}/>}
       {screen==="cp:editTeams"&&game&&<CPEditTeams teams={game.teams} onBack={()=>setScreen("cp:game")} onSave={t=>{upd({teams:t});setScreen("cp:game");showToast("Teams updated!")}}/>}
       {screen==="cp:history"&&game&&<CPHistory game={game} scores={cpScores} onBack={()=>setScreen("cp:game")} onShare={()=>setScreen("cp:share")} lang={lang}/>}
       {screen==="cp:share"&&game&&<CPShare game={game} scores={cpScores} onBack={()=>setScreen("cp:game")} showToast={showToast} lang={lang}/>}
@@ -250,7 +256,7 @@ function App(){
         onHistory={()=>setScreen("ttf:history")} onShare={()=>setScreen("ttf:share")}
         onDash={()=>{save("cg:dashback","ttf:game");setScreen("ttf:dash")}}
         onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
-        onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang} onEditPlayers={()=>setScreen("ttf:editPlayers")}/>}
+        onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang} onEditPlayers={()=>setScreen("ttf:editPlayers")} onUndo={undoLastRound}/>}
       {screen==="ttf:editPlayers"&&game&&<TTFEditPlayers players={game.players} onBack={()=>setScreen("ttf:game")} onSave={p=>{upd({players:p});setScreen("ttf:game");showToast("Updated!")}}/>}
       {screen==="ttf:history"&&game&&<TTFHistory game={game} scores={ttfScores} onBack={()=>setScreen("ttf:game")} onShare={()=>setScreen("ttf:share")} lang={lang}/>}
       {screen==="ttf:share"&&game&&<TTFShare game={game} scores={ttfScores} onBack={()=>setScreen("ttf:game")} showToast={showToast} lang={lang}/>}
@@ -262,13 +268,13 @@ function App(){
         onSubmit={nr=>{upd({rounds:[...game.rounds,nr]});showToast("Round "+(game.rounds.length+1)+" recorded!");}}
         onHistory={()=>setScreen("uno:history")} onShare={()=>setScreen("uno:share")}
         onRules={()=>setScreen("uno:rules")} onDash={()=>setScreen("uno:dash")}
-        onEditPlayers={()=>setScreen("uno:editPlayers")}
+        onEditPlayers={()=>setScreen("uno:editPlayers")} onUndo={undoLastRound}
         onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
         onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang}/>}
       {screen==="uno:history"&&game&&<UNOHistory game={game} onBack={()=>setScreen("uno:game")} onShare={()=>setScreen("uno:share")}/>}
       {screen==="uno:rules"&&<UNORules onBack={()=>setScreen(game?"uno:game":"home")}/>}
       {screen==="uno:share"&&game&&<GenericShare game={game} scores={calcUNOScores(game.rounds)} onBack={()=>setScreen("uno:game")} showToast={showToast} label="UNO" color="#e63946"/>}
-      {screen==="uno:editPlayers"&&game&&<GenericEditPlayers players={game.players} onBack={()=>setScreen("uno:game")} color="#e63946" label="UNO" onSave={p=>{upd({players:p});setScreen("uno:game");showToast("Updated!");}}/>}
+      {screen==="uno:editPlayers"&&game&&<SeatOrderEditor players={game.players} onBack={()=>setScreen("uno:game")} color="#e63946" label="UNO" onSave={p=>{upd({players:p});setScreen("uno:game");showToast("Seats updated!");}}/>}
       {screen==="uno:dash"&&game&&<UNODashboard game={game} onBack={()=>setScreen("uno:game")} showToast={showToast}/>}
 
       {/* ── 28 ── */}
@@ -277,7 +283,7 @@ function App(){
         onSubmit={nr=>{upd({rounds:[...game.rounds,nr]});showToast("Round "+(game.rounds.length+1)+" recorded!");}}
         onHistory={()=>setScreen("g28:history")} onRules={()=>setScreen("g28:rules")}
         onShare={()=>setScreen("g28:share")} onDash={()=>setScreen("g28:dash")}
-        onEditTeams={()=>setScreen("g28:editTeams")}
+        onEditTeams={()=>setScreen("g28:editTeams")} onUndo={undoLastRound}
         onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
         onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang}/>}
       {screen==="g28:history"&&game&&<G28History game={game} onBack={()=>setScreen("g28:game")}/>}
@@ -293,13 +299,13 @@ function App(){
         onSubmit={nr=>{upd({rounds:[...game.rounds,nr],dealerIdx:((nr.dealerIdx||0)+1)%game.players.length});showToast("Hand "+(game.rounds.length+1)+" recorded!");}}
         onHistory={()=>setScreen("tp:history")} onRules={()=>setScreen("tp:rules")}
         onShare={()=>setScreen("tp:share")} onDash={()=>setScreen("tp:dash")}
-        onEditPlayers={()=>setScreen("tp:editPlayers")}
+        onEditPlayers={()=>setScreen("tp:editPlayers")} onUndo={undoLastRound}
         onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
         onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang}/>}
       {screen==="tp:history"&&game&&<TPHistory game={game} onBack={()=>setScreen("tp:game")} onShare={()=>setScreen("tp:share")} color="#9b5de5" label="TEEN PATTI"/>}
       {screen==="tp:rules"&&<TeenPattiRules onBack={()=>setScreen(game?"tp:game":"home")}/>}
       {screen==="tp:share"&&game&&<GenericShare game={game} scores={game.players.map((_,i)=>Number(game.chipStart)+game.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||r.deltas?.[i]||0),0))} onBack={()=>setScreen("tp:game")} showToast={showToast} label="Teen Patti" color="#9b5de5"/>}
-      {screen==="tp:editPlayers"&&game&&<GenericEditPlayers players={game.players} onBack={()=>setScreen("tp:game")} color="#9b5de5" label="Teen Patti" onSave={p=>{upd({players:p});setScreen("tp:game");showToast("Updated!");}}/>}
+      {screen==="tp:editPlayers"&&game&&<SeatOrderEditor players={game.players} onBack={()=>setScreen("tp:game")} color="#9b5de5" label="Teen Patti" onSave={p=>{upd({players:p});setScreen("tp:game");showToast("Seats updated!");}}/>}
       {screen==="tp:dash"&&game&&<GenericDashboard game={game} onBack={()=>setScreen("tp:game")} showToast={showToast} label="Teen Patti" color="#9b5de5" getScores={g=>g.players.map((_,i)=>g.chipStart+g.rounds.reduce((a,r)=>a+(r.deltas?.[i]||0),0))} getPlayers={g=>g.players}/>}
 
       {/* ── Poker ── */}
@@ -309,13 +315,13 @@ function App(){
         onSubmit={nr=>{upd({rounds:[...game.rounds,nr],dealerIdx:((nr.dealerIdx||0)+1)%game.players.length});showToast("Hand "+(game.rounds.length+1)+" recorded!");}}
         onHistory={()=>setScreen("poker:history")} onRules={()=>setScreen("poker:rules")}
         onShare={()=>setScreen("poker:share")} onDash={()=>setScreen("poker:dash")}
-        onEditPlayers={()=>setScreen("poker:editPlayers")}
+        onEditPlayers={()=>setScreen("poker:editPlayers")} onUndo={undoLastRound}
         onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
         onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang}/>}
       {screen==="poker:history"&&game&&<PokerHistory game={game} onBack={()=>setScreen("poker:game")} onShare={()=>setScreen("poker:share")}/>}
       {screen==="poker:rules"&&<PokerRules onBack={()=>setScreen(game?"poker:game":"home")}/>}
       {screen==="poker:share"&&game&&<GenericShare game={game} scores={game.players.map((_,i)=>Number(game.chipStart)+game.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||r.deltas?.[i]||0),0))} onBack={()=>setScreen("poker:game")} showToast={showToast} label="Poker" color="#2a9d8f"/>}
-      {screen==="poker:editPlayers"&&game&&<GenericEditPlayers players={game.players} onBack={()=>setScreen("poker:game")} color="#2a9d8f" label="Poker" onSave={p=>{upd({players:p});setScreen("poker:game");showToast("Updated!");}}/>}
+      {screen==="poker:editPlayers"&&game&&<SeatOrderEditor players={game.players} onBack={()=>setScreen("poker:game")} color="#2a9d8f" label="Poker" onSave={p=>{upd({players:p});setScreen("poker:game");showToast("Seats updated!");}}/>}
       {screen==="poker:dash"&&game&&<GenericDashboard game={game} onBack={()=>setScreen("poker:game")} showToast={showToast} label="Poker" color="#2a9d8f" getScores={g=>g.players.map((_,i)=>Number(g.chipStart)+g.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||r.deltas?.[i]||0),0))} getPlayers={g=>g.players}/>}
 
       {/* ── Rummy ── */}
@@ -324,13 +330,13 @@ function App(){
         onSubmit={nr=>{upd({rounds:[...game.rounds,nr]});showToast("Round "+(game.rounds.length+1)+" recorded!");}}
         onHistory={()=>setScreen("rummy:history")} onRules={()=>setScreen("rummy:rules")}
         onShare={()=>setScreen("rummy:share")} onDash={()=>setScreen("rummy:dash")}
-        onEditPlayers={()=>setScreen("rummy:editPlayers")}
+        onEditPlayers={()=>setScreen("rummy:editPlayers")} onUndo={undoLastRound}
         onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
         onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang}/>}
       {screen==="rummy:history"&&game&&<RummyHistory game={game} onBack={()=>setScreen("rummy:game")}/>}
       {screen==="rummy:rules"&&<RummyRules onBack={()=>setScreen(game?"rummy:game":"home")}/>}
       {screen==="rummy:share"&&game&&<GenericShare game={game} scores={game.players.map((_,i)=>game.rounds.reduce((a,r)=>a+(r.scores?.[i]||0),0))} onBack={()=>setScreen("rummy:game")} showToast={showToast} label="Rummy" color="#f15bb5"/>}
-      {screen==="rummy:editPlayers"&&game&&<GenericEditPlayers players={game.players} onBack={()=>setScreen("rummy:game")} color="#f15bb5" label="Rummy" onSave={p=>{upd({players:p});setScreen("rummy:game");showToast("Updated!");}}/>}
+      {screen==="rummy:editPlayers"&&game&&<SeatOrderEditor players={game.players} onBack={()=>setScreen("rummy:game")} color="#f15bb5" label="Rummy" onSave={p=>{upd({players:p});setScreen("rummy:game");showToast("Seats updated!");}}/>}
       {screen==="rummy:dash"&&game&&<RummyDashboard game={game} onBack={()=>setScreen("rummy:game")} showToast={showToast}/>}
 
       {screen==="import"&&<Import onBack={()=>setScreen("home")} onImport={imp=>{setGames(ex=>{const ids=new Set(ex.map(g=>g.id));return[...ex,...imp.filter(g=>!ids.has(g.id))]});showToast("Imported!");setScreen("home")}}/>}
@@ -518,6 +524,45 @@ function RummyDashboard({game,onBack,showToast}){
   );
 }
 
+// ── Generic Seat Order Editor ─────────────────────────────────────────────────
+function SeatOrderEditor({players,onBack,onSave,color,label}){
+  const[d,setD]=useState([...players]);
+  const move=(i,dir)=>{
+    const x=[...d];
+    const j=i+dir;
+    if(j<0||j>=x.length)return;
+    [x[i],x[j]]=[x[j],x[i]];
+    setD(x);
+  };
+  return(
+    <div style={{padding:"48px 20px 40px"}}>
+      <button onClick={onBack} style={BK}>← Cancel</button>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+        <span style={{fontSize:10,fontWeight:700,color:"white",background:color||"#111",borderRadius:8,padding:"3px 10px"}}>{label||"GAME"}</span>
+        <h1 style={PT}>Edit Players & Seats</h1>
+      </div>
+      <p style={{color:"#888",fontSize:13,margin:"0 0 16px"}}>Use ↑↓ to change seating order. Seat order affects turn sequence and target assignment.</p>
+      <div style={{display:"flex",flexDirection:"column",gap:9}}>
+        {d.map((pl,i)=>(
+          <div key={i} style={{display:"flex",gap:8,alignItems:"center"}}>
+            <div style={{width:28,height:28,borderRadius:8,background:color+"22",color:color,fontWeight:800,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>#{i+1}</div>
+            <div style={{flex:1,background:"#f7f7f7",borderRadius:12,padding:"11px 14px",fontSize:14,fontWeight:600,color:"#111"}}>{pl}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:3,flexShrink:0}}>
+              {i>0&&<button onClick={()=>move(i,-1)} style={{width:32,height:28,background:"#f2f2f2",border:"none",borderRadius:8,cursor:"pointer",fontSize:14,fontWeight:700}}>↑</button>}
+              {i<d.length-1&&<button onClick={()=>move(i,1)} style={{width:32,height:28,background:"#f2f2f2",border:"none",borderRadius:8,cursor:"pointer",fontSize:14,fontWeight:700}}>↓</button>}
+            </div>
+          </div>
+        ))}
+        <div style={{background:"#f0f5ff",borderRadius:12,padding:"10px 14px",fontSize:12,color:"#4a7cfc",marginTop:4}}>
+          💡 Tip: Players take turns in seat order (#1 → #2 → #3 → ...). Drag to arrange as they sit around the table.
+        </div>
+        <Btn primary onClick={()=>onSave(d)} style={{background:color||"#111"}}>Save Seat Order</Btn>
+      </div>
+    </div>
+  );
+}
+
+
 function GenericEditPlayers({players,onBack,onSave,color,label}){
   const[d,setD]=useState([...players]);
   return(
@@ -698,9 +743,7 @@ function CPSetup({onBack,onStart}){
             {[0,1].map(pi=><div key={pi} style={{marginBottom:pi===0?8:0}}><Inp value={d.teams[ti].players[pi]} placeholder={"Player "+(pi+1)} onChange={v=>st(ti,pi,v)}/></div>)}
           </Card>
         ))}
-        <div style={{background:"#f0fff4",border:"1px solid #bbf7d0",borderRadius:14,padding:"10px 14px",fontSize:13,color:"#166534"}}>
-          💡 <strong>Dealer = Shuffler.</strong> Each round, pick who shuffles — their targets auto-set to 2. The next player gets 5, last gets 3.
-        </div>
+
         <Btn primary disabled={!ok} onClick={()=>onStart({...d,id:Date.now()})}>Start Game →</Btn>
       </div>
     </div>
@@ -728,7 +771,7 @@ function CPEditTeams({teams,onBack,onSave}){
   );
 }
 
-function CPGame({game,scores,round:r,setRound,onSubmit,onEditTeams,onHistory,onShare,onDash,onEnd,onHome,showToast,lang,setLang}){
+function CPGame({game,scores,round:r,setRound,onSubmit,onEditTeams,onHistory,onShare,onDash,onEnd,onHome,showToast,lang,setLang,setScreen,onUndo}){
   const rn=game.rounds.length+1;
   const t0=r.tricks[0]!==""?Number(r.tricks[0]):null,t1=r.tricks[1]!==""?Number(r.tricks[1]):null;
   const sum=t0!==null&&t1!==null?t0+t1:null,ok=t0!==null&&t1!==null&&sum===13;
@@ -796,6 +839,7 @@ function CPGame({game,scores,round:r,setRound,onSubmit,onEditTeams,onHistory,onS
           <button onClick={onDash} style={SB}>📊 Stats</button>
         </div>
         <div style={{display:"flex",gap:10}}>
+          <button onClick={onUndo} style={{...SB,flex:1,color:"#f4a261"}}>↩ Undo</button>
           <button onClick={()=>{if(window.confirm("End game?"))onEnd()}} style={{...SB,flex:1}}>🏁 End Game</button>
         </div>
       </div>
@@ -1043,14 +1087,12 @@ function TTFSetup({onBack,onStart}){
           <Lbl>Players</Lbl>
           {[0,1,2].map(i=>(
             <div key={i} style={{marginBottom:i<2?10:0}}>
-              <div style={{fontSize:12,color:"#888",marginBottom:4}}>Player {i+1} <span style={{color:"#16a34a",fontWeight:600}}>({i===2?"5 hands caller":i===0?"3 hands":"2 hands"} default)</span></div>
+              <div style={{fontSize:12,color:"#888",marginBottom:4}}>Player {i+1}</div>
               <Inp value={d.players[i]} placeholder={"Player "+(i+1)+" name"} bold onChange={v=>setP(i,v)}/>
             </div>
           ))}
         </Card>
-        <div style={{background:"#f0fff4",border:"1px solid #bbf7d0",borderRadius:14,padding:"10px 14px",fontSize:13,color:"#166534"}}>
-          💡 <strong>Dealer = Shuffler.</strong> Each round, pick who shuffles — their targets auto-set to 2. The next player gets 5, last gets 3.
-        </div>
+
         <Btn primary disabled={!ok} onClick={()=>onStart({...d,id:Date.now()})}>Start Game →</Btn>
       </div>
     </div>
@@ -1086,7 +1128,7 @@ function TTFEditPlayers({players,onBack,onSave}){
 }
 
 // 3-2-5 Game Screen
-function TTFGame({game,scores,round:r,setRound,onSubmit,onHistory,onShare,onDash,onEnd,onHome,showToast,lang,setLang,onEditPlayers}){
+function TTFGame({game,scores,round:r,setRound,onSubmit,onHistory,onShare,onDash,onEnd,onHome,showToast,lang,setLang,onEditPlayers,onUndo}){
   const rn=game.rounds.length+1;
   const p=game.players;
   // Targets must sum to 10 (3+2+5=10)
@@ -1144,7 +1186,7 @@ function TTFGame({game,scores,round:r,setRound,onSubmit,onHistory,onShare,onDash
           <div key={i} style={{flex:1,background:"white",borderRadius:13,padding:"11px 7px",textAlign:"center",boxShadow:"0 2px 6px rgba(0,0,0,0.06)"}}>
             <div style={{fontSize:10,color:COLORS[i],textTransform:"uppercase",letterSpacing:0.5,fontWeight:700,marginBottom:2}}>{p[i]}</div>
             <div style={{fontSize:26,fontWeight:900,color:"#111",lineHeight:1}}>{cumScores[i]>=0?"+":""}{cumScores[i]}</div>
-            <div style={{fontSize:10,color:"#bbb",marginTop:2}}>target {r.targets[i]}</div>
+
             {dealerIdx===i&&<div style={{fontSize:9,color:"#856404",fontWeight:700}}>🃏 shuffler</div>}
             {dealerIdx>=0&&(dealerIdx+1)%3===i&&<div style={{fontSize:9,color:"#16a34a",fontWeight:700}}>⭐ caller</div>}
           </div>
@@ -1162,17 +1204,30 @@ function TTFGame({game,scores,round:r,setRound,onSubmit,onHistory,onShare,onDash
             {SUITS.map(s=>{const sel=r.trump===s,red=RED.has(s);return<button key={s} onClick={()=>setRound(c=>({...c,trump:sel?null:s}))} style={{width:52,height:52,borderRadius:13,fontSize:24,cursor:"pointer",background:sel?(red?"#fff0f0":"#f0fff4"):"#f7f7f7",border:sel?"2px solid "+(red?"#e63946":"#16a34a"):"2px solid #ebebeb",color:red?"#e63946":"#1a1a2e",transform:sel?"scale(1.1)":"scale(1)",transition:"all 0.15s"}}>{s}</button>})}
           </div>
         </Card>
-        {/* Targets per round */}
+        {/* Targets per round - always visible, auto from shuffler */}
         <Card>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><Lbl style={{margin:0}}>Targets <M>(total must be 10)</M></Lbl>{r.shuffler?<div style={{fontSize:10,color:"#16a34a",fontWeight:600}}>Auto-set ✓</div>:<div style={{fontSize:10,color:"#e63946"}}>Pick shuffler first ↑</div>}</div>
-          <div style={{display:"flex",gap:8,marginBottom:10}}>{[0,1,2].map(i=>{const isDealer=r.dealerIdx===i,isCaller=(r.dealerIdx+1)%3===i;return(<div key={i} style={{flex:1,textAlign:"center",padding:"6px 4px",background:isDealer?"#fff8e1":isCaller?"#f0fff4":"#f0f5ff",borderRadius:10}}><div style={{fontSize:10,fontWeight:700,color:isDealer?"#856404":isCaller?"#16a34a":"#4a7cfc"}}>{isDealer?"🃏 Shuffler (2)":isCaller?"⭐ Caller (5)":"3️⃣ (3)"}</div><div style={{fontSize:11,color:COLORS[i],fontWeight:700,marginTop:1}}>{p[i]}</div><div style={{fontSize:13,fontWeight:900,color:"#111",marginTop:2}}>{r.targets[i]}</div></div>);})}</div>
-          <div style={{fontSize:11,color:"#888",marginBottom:6,textAlign:"center"}}>Adjust if needed:</div>
-          <div style={{display:"flex",gap:10}}>{[0,1,2].map(i=>(<div key={i} style={{flex:1,textAlign:"center"}}><div style={{display:"flex",flexWrap:"wrap",gap:3,justifyContent:"center"}}>{[0,1,2,3,4,5,6,7,8,9,10].map(n=>{const sel=r.targets[i]===n;return<button key={n} onClick={()=>setTarget(i,n)} style={{width:28,height:28,borderRadius:7,fontSize:11,fontWeight:sel?800:500,background:sel?COLORS[i]:"#f2f2f2",color:sel?"white":"#444",border:sel?"2px solid "+COLORS[i]:"2px solid transparent",cursor:"pointer"}}>{n}</button>;})}</div></div>))}</div>
-          {!targetsOk&&<div style={{marginTop:8,color:"#e63946",fontSize:12,textAlign:"center",fontWeight:600}}>⚠ Must total 10 (currently {r.targets.reduce((a,b)=>a+b,0)})</div>}
-
+          <Lbl>Targets This Round</Lbl>
+          <div style={{display:"flex",gap:8,marginTop:8}}>
+            {[0,1,2].map(i=>{
+              const isDealer=r.dealerIdx===i;
+              const isCaller=(r.dealerIdx+1)%3===i;
+              const hasShuffler=r.shuffler!=null;
+              return(
+                <div key={i} style={{flex:1,textAlign:"center",padding:"10px 6px",background:!hasShuffler?"#f7f7f7":isDealer?"#fff8e1":isCaller?"#f0fff4":"#f0f5ff",borderRadius:12,border:!hasShuffler?"1.5px dashed #ddd":"none"}}>
+                  <div style={{fontSize:10,fontWeight:700,color:!hasShuffler?"#bbb":isDealer?"#856404":isCaller?"#16a34a":"#4a7cfc"}}>
+                    {!hasShuffler?"Pick shuffler ↓":isDealer?"🃏 Shuffler":isCaller?"⭐ Caller":"3️⃣"}
+                  </div>
+                  <div style={{fontSize:11,color:COLORS[i],fontWeight:700,marginTop:2}}>{p[i]}</div>
+                  <div style={{fontSize:22,fontWeight:900,color:hasShuffler?"#111":"#ddd",marginTop:2}}>{hasShuffler?r.targets[i]:"—"}</div>
+                </div>
+              );
+            })}
+          </div>
+          {!r.shuffler&&<div style={{marginTop:8,fontSize:12,color:"#e63946",textAlign:"center",fontWeight:600}}>⚠ Pick shuffler below to set targets</div>}
         </Card>
+
         {/* Shuffler */}
-        <ShufflerCard players={p} value={r.shuffler} onChange={v=>{
+        <ShufflerCard required players={p} value={r.shuffler} onChange={v=>{
           // Dealer = shuffler. Auto-set targets based on who shuffled.
           const di=v!=null?p.indexOf(v):-1;
           const newTargets=di>=0?ttfTargetsForDealer(di):[...r.targets];
@@ -1210,12 +1265,15 @@ function TTFGame({game,scores,round:r,setRound,onSubmit,onHistory,onShare,onDash
             </div>
           )}
         </Card>
-        <Btn primary disabled={!actualsOk||!targetsOk} onClick={submit} style={{background:"#16a34a"}}>Record Round {rn}{r.trump?" "+r.trump:""}</Btn>
+        <Btn primary disabled={!actualsOk||!r.shuffler} onClick={submit} style={{background:"#16a34a"}}>Record Round {rn}{r.trump?" "+r.trump:""}</Btn>
         <div style={{display:"flex",gap:10}}>
           <button onClick={onShare} style={SB}>📤 Share</button>
           <button onClick={onDash} style={SB}>📊 Stats</button>
         </div>
-        <button onClick={()=>{if(window.confirm("End game?"))onEnd()}} style={{...SB,flex:1,width:"100%"}}>🏁 End Game</button>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={onUndo} style={{...SB,flex:1,color:"#f4a261"}}>↩ Undo</button>
+          <button onClick={()=>{if(window.confirm("End game?"))onEnd()}} style={{...SB,flex:1}}>🏁 End Game</button>
+        </div>
       </div>
     </div>
   );
@@ -2193,6 +2251,38 @@ function TPGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,
         )}
 
         {/* Showdown / winner picker */}
+        {h.status==="sideshow"&&(
+          <Card style={{border:"2px solid #f15bb5",background:"#fff0f8"}}>
+            <Lbl>🤝 Sideshow — Compare & Pick Loser</Lbl>
+            <p style={{fontSize:12,color:"#888",marginBottom:10}}>
+              Only <strong>{h.sideshowPlayers&&h.sideshowPlayers.map(i=>p[i]).join(" vs ")}</strong> compare hands privately. 
+              The lower hand folds. Game continues with remaining players.
+            </p>
+            <div style={{display:"flex",gap:8}}>
+              {(h.sideshowPlayers||[]).map(i=>(
+                <button key={i} onClick={()=>{
+                  const nh=JSON.parse(JSON.stringify(h));
+                  nh.pStatus[i]="folded";
+                  nh.status="active"; // game continues — NOT showdown
+                  nh.winner=null;
+                  const rem=nh.pStatus.filter(s=>s!=="folded"&&s!=="out").length;
+                  if(rem===1){
+                    const wi=nh.pStatus.findIndex(s=>s!=="folded"&&s!=="out");
+                    nh.changes[wi]+=nh.pot;
+                    nh.status="finished";
+                    nh.winner=wi;
+                  }
+                  setHand(nh);
+                }} style={{flex:1,padding:"12px 8px",borderRadius:13,background:PC[i%PC.length],color:"white",border:"none",fontWeight:700,fontSize:14,cursor:"pointer"}}>{p[i]} has lower hand → folds</button>
+              ))}
+            </div>
+            <button onClick={()=>{
+              const nh=JSON.parse(JSON.stringify(h));
+              nh.status="active";
+              setHand(nh);
+            }} style={{width:"100%",marginTop:8,padding:"8px",borderRadius:10,background:"#f2f2f2",border:"none",color:"#888",fontSize:13,cursor:"pointer"}}>Cancel sideshow</button>
+          </Card>
+        )}
         {(h.status==="showdown"||showWinner||(h.status==="finished"&&h.winner!=null))&&(
           <Card style={{border:"2px solid #16a34a",background:"#f0fff4"}}>
             {h.status==="finished"&&h.winner!=null?(
@@ -2220,6 +2310,20 @@ function TPGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,
           <button onClick={onDash} style={{...SB,flex:1}}>📊 Stats</button>
         </div>
         <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>{
+            if(h.actions.length>0){
+              const nh=JSON.parse(JSON.stringify(h));
+              const last=nh.actions.pop();
+              // Reverse the action effects
+              if(last.action==="Fold")nh.pStatus[p.indexOf(last.player)]="blind";
+              else if(last.action==="Seen")nh.pStatus[p.indexOf(last.player)]="blind";
+              if(last.amount>0){nh.pot-=last.amount;nh.changes[p.indexOf(last.player)]+=last.amount;}
+              nh.status="active";nh.winner=null;
+              setHand(nh);setShowWinner(false);showToast("Action undone ↩");
+            } else if(game.rounds.length>0&&window.confirm("Undo last saved hand?")){
+              onUndo();
+            } else showToast("Nothing to undo");
+          }} style={{...SB,flex:1,color:"#f4a261"}}>↩ Undo</button>
           <button onClick={()=>{setHand(makeTPHand(p,boot,(Number(h.dealerIdx)+1)%p.length));setShowWinner(false);}} style={{...SB,flex:1,color:"#9b5de5"}}>↺ New Hand</button>
           <button onClick={()=>{if(window.confirm("End game?"))onEnd();}} style={{...SB,flex:1}}>🏁 End</button>
         </div>
@@ -2400,7 +2504,7 @@ function PokerSetup({onBack,onStart}){
   );
 }
 
-function PokerGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,onDash,onEditPlayers,lang,setLang}){
+function PokerGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,onDash,onEditPlayers,lang,setLang,onUndo}){
   const p=game.players;
   const sb=Number(game.sb)||5;
   const bb=Number(game.bb)||10;
@@ -2609,6 +2713,21 @@ function PokerGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onSha
           <button onClick={onDash} style={{...SB,flex:1}}>📊 Stats</button>
         </div>
         <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>{
+            if(h.actions.length>0){
+              const nh=JSON.parse(JSON.stringify(h));
+              const last=nh.actions.pop();
+              const sa=nh.streetActions[nh.street]||[];
+              if(sa.length>0)sa.pop();
+              if(last.action==="Fold")nh.pStatus[p.indexOf(last.player)]="active";
+              else if(last.action==="All-In")nh.pStatus[p.indexOf(last.player)]="active";
+              if(last.amount>0){nh.pot-=last.amount;nh.changes[p.indexOf(last.player)]+=last.amount;nh.pBets[p.indexOf(last.player)]=Math.max(0,nh.pBets[p.indexOf(last.player)]-last.amount);}
+              nh.status="active";nh.winner=null;
+              setHand(nh);showToast("Action undone ↩");
+            } else if(game.rounds.length>0&&window.confirm("Undo last saved hand?")){
+              onUndo();
+            } else showToast("Nothing to undo");
+          }} style={{...SB,flex:1,color:"#f4a261"}}>↩ Undo</button>
           <button onClick={()=>setHand(makePokerHand(p,sb,bb,(Number(h.dealerIdx)+1)%p.length))} style={{...SB,flex:1,color:"#2a9d8f"}}>↺ New Hand</button>
           <button onClick={()=>{if(window.confirm("End game?"))onEnd();}} style={{...SB,flex:1}}>🏁 End</button>
         </div>
