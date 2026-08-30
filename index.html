@@ -629,7 +629,7 @@ function getGameScore(g){
   if(g.type==="ttf")return calcTTFScores(g.rounds).map((s,i)=>(s>=0?"+":"")+s).join(" | ");
   if(g.type==="uno")return calcUNOScores(g.rounds).join(" – ");
   if(g.type==="g28")return calc28Scores(g.rounds).join(" – ");
-  if(g.type==="tp"||g.type==="poker"){const p=g.players;return p.map((_,i)=>g.chipStart+g.rounds.reduce((a,r)=>a+(r.deltas?.[i]||0),0)).join(" | ");}
+  if(g.type==="tp"||g.type==="poker"){const p=g.players;return p.map((_,i)=>Number(g.chipStart)+g.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||r.deltas?.[i]||0),0)).join(" | ");}
   if(g.type==="rummy")return g.players.map((_,i)=>g.rounds.reduce((a,r)=>a+(r.scores?.[i]||0),0)).join(" – ");
   return "—";
 }
@@ -1563,9 +1563,9 @@ function UNOGame({ game, onSubmit, onHistory, onShare, onRules, onEnd, onHome, s
   const COLORS = ["#e63946", "#f4a261", "#2a9d8f", "#4a7cfc", "#9b5de5", "#f15bb5", "#00bbf9", "#fee440", "#06d6a0", "#fb8500"];
 
   const submit = () => {
-    // Winner gets 0, others' cards are summed and added to winner's total
-    const scores = p.map((_, i) => i === winner ? p.reduce((a, _, j) => j !== winner ? a + (Number(pts[j]) || 0) : a, 0) : 0);
-    onSubmit({ winner, winnerName: p[winner], cardPts: pts.map(Number), scores, ts: new Date().toISOString() });
+    // Winner gets 0 points. Each loser gets their own card points added to their score.
+    const roundScores = p.map((_, i) => i === winner ? 0 : (Number(pts[i]) || 0));
+    onSubmit({ winner, winnerName: p[winner], cardPts: pts.map(Number), scores: roundScores, ts: new Date().toISOString() });
     setPts(p.map(() => ""));
     setWinner(0);
   };
@@ -1584,7 +1584,8 @@ function UNOGame({ game, onSubmit, onHistory, onShare, onRules, onEnd, onHome, s
           <p style={{ margin: "2px 0 0", color: "#bbb", fontSize: 12 }}>Round {rn} · Target: {game.targetScore} pts</p>
         </div>
         <div style={{ display: "flex", gap: 6, paddingTop: 28 }}>
-          <Pill onClick={onRules}>📖 Rules</Pill>
+          <Pill onClick={onEditPlayers}>✏️</Pill>
+          <Pill onClick={onRules}>📖</Pill>
           <Pill onClick={onHistory}>History</Pill>
         </div>
       </div>
@@ -1854,7 +1855,8 @@ function G28Game({ game, onSubmit, onHistory, onRules, onEnd, onHome, showToast 
           <p style={{ margin: "2px 0 0", color: "#bbb", fontSize: 12 }}>Round {rn}</p>
         </div>
         <div style={{ display: "flex", gap: 6, paddingTop: 28 }}>
-          <Pill onClick={onRules}>📖 Rules</Pill>
+          <Pill onClick={onEditPlayers}>✏️</Pill>
+          <Pill onClick={onRules}>📖</Pill>
           <Pill onClick={onHistory}>History</Pill>
         </div>
       </div>
@@ -2097,9 +2099,10 @@ function TPSetup({ onBack, onStart }) {
         </Card>
         <Card>
           <Lbl>Starting Chips</Lbl>
-          <div style={{display:"flex",gap:8}}>
+          <div style={{display:"flex",gap:8,marginBottom:8}}>
             {[100,200,500,1000].map(c=><button key={c} onClick={()=>setChips(c)} style={{flex:1,padding:"10px 4px",borderRadius:11,border:chips===c?"2px solid #9b5de5":"2px solid transparent",background:chips===c?"#f5f0ff":"#f2f2f2",color:chips===c?"#9b5de5":"#555",fontWeight:700,fontSize:13,cursor:"pointer"}}>{c}</button>)}
           </div>
+          <input type="number" min="10" placeholder="Custom chips..." value={[100,200,500,1000].includes(chips)?"":(chips||"")} onChange={e=>e.target.value&&setChips(Number(e.target.value))} style={{width:"100%",padding:"9px 12px",borderRadius:10,border:"1.5px solid #d8b4fe",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
         </Card>
         <Btn primary disabled={!ok} onClick={()=>onStart({id:Date.now(),type:"tp",name,players:players.slice(0,n),boot,chipStart:chips,dealerIdx:0,rounds:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),finished:false})} style={{background:"#9b5de5"}}>Start Game →</Btn>
       </div>
