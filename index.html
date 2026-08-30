@@ -306,7 +306,7 @@ function App(){
       {screen==="tp:rules"&&<TeenPattiRules onBack={()=>setScreen(game?"tp:game":"home")}/>}
       {screen==="tp:share"&&game&&<GenericShare game={game} scores={game.players.map((_,i)=>Number(game.chipStart)+game.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||r.deltas?.[i]||0),0))} onBack={()=>setScreen("tp:game")} showToast={showToast} label="Teen Patti" color="#9b5de5"/>}
       {screen==="tp:editPlayers"&&game&&<SeatOrderEditor players={game.players} onBack={()=>setScreen("tp:game")} color="#9b5de5" label="Teen Patti" onSave={p=>{upd({players:p});setScreen("tp:game");showToast("Seats updated!");}}/>}
-      {screen==="tp:dash"&&game&&<GenericDashboard game={game} onBack={()=>setScreen("tp:game")} showToast={showToast} label="Teen Patti" color="#9b5de5" getScores={g=>g.players.map((_,i)=>g.chipStart+g.rounds.reduce((a,r)=>a+(r.deltas?.[i]||0),0))} getPlayers={g=>g.players}/>}
+      {screen==="tp:dash"&&game&&<GenericDashboard game={game} onBack={()=>setScreen("tp:game")} showToast={showToast} label="Teen Patti" color="#9b5de5" getScores={g=>g.players.map((_,i)=>Number(g.chipStart)+g.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||r.deltas?.[i]||0),0))} getPlayers={g=>g.players}/>}
 
       {/* ── Poker ── */}
       {screen==="poker:setup"&&<PokerSetup onBack={()=>setScreen("home")}
@@ -1536,10 +1536,16 @@ function UNOSetup({ onBack, onStart }) {
         </Card>
         <Card>
           <Lbl>Win Target</Lbl>
-          <div style={{ display: "flex", gap: 8 }}>
-            {[200, 300, 500, 1000].map(n => (
-              <button key={n} onClick={() => setD(g => ({ ...g, targetScore: n }))} style={{ flex: 1, padding: "10px 4px", borderRadius: 12, border: d.targetScore === n ? "2px solid #e63946" : "2px solid transparent", background: d.targetScore === n ? "#fff0f0" : "#f2f2f2", color: d.targetScore === n ? "#e63946" : "#555", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{n} pts</button>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+            {[200,300,500,1000].map(n=>(
+              <button key={n} onClick={()=>setD(g=>({...g,targetScore:n}))} style={{flex:1,padding:"10px 4px",borderRadius:12,border:d.targetScore===n?"2px solid #e63946":"2px solid transparent",background:d.targetScore===n?"#fff0f0":"#f2f2f2",color:d.targetScore===n?"#e63946":"#555",fontWeight:700,fontSize:13,cursor:"pointer"}}>{n}</button>
             ))}
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <input type="number" min="50" placeholder="Custom target..." value={[200,300,500,1000].includes(d.targetScore)?"":(d.targetScore||"")}
+              onChange={e=>e.target.value&&setD(g=>({...g,targetScore:Number(e.target.value)}))}
+              style={{flex:1,padding:"9px 12px",borderRadius:10,border:"1.5px solid #e8e8e8",fontSize:14,outline:"none"}}/>
+            <span style={{fontSize:12,color:"#888"}}>pts</span>
           </div>
         </Card>
         <Btn primary disabled={!ok} onClick={() => onStart({ ...d, players: d.players.slice(0, numPlayers), id: Date.now() })} style={{ background: "#e63946" }}>Start Game →</Btn>
@@ -1548,7 +1554,7 @@ function UNOSetup({ onBack, onStart }) {
   );
 }
 
-function UNOGame({ game, onSubmit, onHistory, onShare, onRules, onEnd, onHome, showToast, lang, setLang }) {
+function UNOGame({ game, onSubmit, onHistory, onShare, onRules, onEnd, onHome, showToast, lang, setLang, onDash, onEditPlayers, onUndo }) {
   const scores = calcUNOScores(game.rounds);
   const rn = game.rounds.length + 1;
   const p = game.players;
@@ -1628,9 +1634,13 @@ function UNOGame({ game, onSubmit, onHistory, onShare, onRules, onEnd, onHome, s
           </div>
         </Card>
         <Btn primary disabled={!canSubmit} onClick={submit} style={{ background: "#e63946" }}>Record Round {rn}</Btn>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onShare} style={SB}>📤 Share</button>
-          <button onClick={() => { if (window.confirm("End game?")) onEnd(); }} style={SB}>🏁 End</button>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={onShare} style={{...SB,flex:1}}>📤 Share</button>
+          <button onClick={onDash} style={{...SB,flex:1}}>📊 Stats</button>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={onUndo} style={{...SB,flex:1,color:"#f4a261"}}>↩ Undo</button>
+          <button onClick={()=>{if(window.confirm("End game?"))onEnd();}} style={{...SB,flex:1}}>🏁 End</button>
         </div>
       </div>
     </div>
@@ -2076,8 +2086,13 @@ function TPSetup({ onBack, onStart }) {
         </Card>
         <Card>
           <Lbl>Boot (Ante)</Lbl>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {[1,2,5,10,20,50].map(c=><button key={c} onClick={()=>setBoot(c)} style={{flex:1,minWidth:44,padding:"10px 4px",borderRadius:11,border:boot===c?"2px solid #9b5de5":"2px solid transparent",background:boot===c?"#f5f0ff":"#f2f2f2",color:boot===c?"#9b5de5":"#555",fontWeight:700,fontSize:13,cursor:"pointer"}}>{c}</button>)}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+            {[1,2,5,10,20,50].map(c=><button key={c} onClick={()=>setBoot(c)} style={{flex:1,minWidth:40,padding:"10px 4px",borderRadius:11,border:boot===c?"2px solid #9b5de5":"2px solid transparent",background:boot===c?"#f5f0ff":"#f2f2f2",color:boot===c?"#9b5de5":"#555",fontWeight:700,fontSize:13,cursor:"pointer"}}>{c}</button>)}
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <input type="number" min="1" placeholder="Custom boot amount..." value={[1,2,5,10,20,50].includes(boot)?"":(boot||"")}
+              onChange={e=>e.target.value&&setBoot(Number(e.target.value))}
+              style={{flex:1,padding:"9px 12px",borderRadius:10,border:"1.5px solid #d8b4fe",fontSize:14,outline:"none"}}/>
           </div>
         </Card>
         <Card>
@@ -2137,8 +2152,26 @@ function TPGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,
       nh.pStatus[ni] = "seen"; nh.pot += amount; nh.changes[ni] -= amount; nh.stake = Math.floor(amount/2);
     } else if (action==="Chaal"||action==="Raise") {
       nh.pot += amount; nh.changes[ni] -= amount; nh.stake = Math.floor(amount/2);
-    } else if (action==="Show"||action==="Sideshow") {
+    } else if (action==="Show") {
       nh.status = "showdown";
+    } else if (action==="Sideshow") {
+      // Find the previous seen player (not current player ni)
+      let prevSeen = -1;
+      for (let i = nh.actions.length - 2; i >= 0; i--) {
+        const idx = p.indexOf(nh.actions[i].player);
+        if (idx !== ni && (nh.pStatus[idx] === "seen" || nh.actions[i].action === "Seen" || nh.actions[i].action === "Chaal")) {
+          prevSeen = idx;
+          break;
+        }
+      }
+      if (prevSeen === -1) {
+        // fallback: any other seen player
+        for (let i = 0; i < p.length; i++) {
+          if (i !== ni && nh.pStatus[i] === "seen") { prevSeen = i; break; }
+        }
+      }
+      nh.status = "sideshow";
+      nh.sideshowPlayers = [ni, prevSeen >= 0 ? prevSeen : (ni + 1) % p.length];
     }
     const rem = nh.pStatus.filter(s=>s!=="folded"&&s!=="out").length;
     if (rem===1) {
@@ -2483,20 +2516,23 @@ function PokerSetup({onBack,onStart}){
         </Card>
         <Card>
           <Lbl>Blinds</Lbl>
-          <div style={{display:"flex",gap:10}}>
+          <div style={{display:"flex",gap:10,marginBottom:8}}>
             <div style={{flex:1}}>
               <div style={{fontSize:11,color:"#888",marginBottom:4}}>Small Blind</div>
-              <div style={{display:"flex",gap:5}}>{[1,2,5,10,25].map(v=><button key={v} onClick={()=>setSb(v)} style={{flex:1,padding:"8px 2px",borderRadius:8,border:sb===v?"2px solid #2a9d8f":"2px solid transparent",background:sb===v?"#f0fdfa":"#f2f2f2",color:sb===v?"#2a9d8f":"#555",fontWeight:700,fontSize:12,cursor:"pointer"}}>{v}</button>)}</div>
+              <div style={{display:"flex",gap:4,marginBottom:6}}>{[1,2,5,10,25].map(v=><button key={v} onClick={()=>setSb(v)} style={{flex:1,padding:"8px 2px",borderRadius:8,border:sb===v?"2px solid #2a9d8f":"2px solid transparent",background:sb===v?"#f0fdfa":"#f2f2f2",color:sb===v?"#2a9d8f":"#555",fontWeight:700,fontSize:12,cursor:"pointer"}}>{v}</button>)}</div>
+              <input type="number" min="1" placeholder="Custom SB" value={[1,2,5,10,25].includes(sb)?"":(sb||"")} onChange={e=>e.target.value&&setSb(Number(e.target.value))} style={{width:"100%",padding:"7px 10px",borderRadius:8,border:"1.5px solid #99f6e4",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
             </div>
             <div style={{flex:1}}>
               <div style={{fontSize:11,color:"#888",marginBottom:4}}>Big Blind</div>
-              <div style={{display:"flex",gap:5}}>{[2,5,10,20,50].map(v=><button key={v} onClick={()=>setBb(v)} style={{flex:1,padding:"8px 2px",borderRadius:8,border:bb===v?"2px solid #2a9d8f":"2px solid transparent",background:bb===v?"#f0fdfa":"#f2f2f2",color:bb===v?"#2a9d8f":"#555",fontWeight:700,fontSize:12,cursor:"pointer"}}>{v}</button>)}</div>
+              <div style={{display:"flex",gap:4,marginBottom:6}}>{[2,5,10,20,50].map(v=><button key={v} onClick={()=>setBb(v)} style={{flex:1,padding:"8px 2px",borderRadius:8,border:bb===v?"2px solid #2a9d8f":"2px solid transparent",background:bb===v?"#f0fdfa":"#f2f2f2",color:bb===v?"#2a9d8f":"#555",fontWeight:700,fontSize:12,cursor:"pointer"}}>{v}</button>)}</div>
+              <input type="number" min="1" placeholder="Custom BB" value={[2,5,10,20,50].includes(bb)?"":(bb||"")} onChange={e=>e.target.value&&setBb(Number(e.target.value))} style={{width:"100%",padding:"7px 10px",borderRadius:8,border:"1.5px solid #99f6e4",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
             </div>
           </div>
         </Card>
         <Card>
           <Lbl>Starting Chips</Lbl>
-          <div style={{display:"flex",gap:8}}>{[100,200,500,1000,2000].map(c=><button key={c} onClick={()=>setChips(c)} style={{flex:1,padding:"9px 2px",borderRadius:10,border:chips===c?"2px solid #2a9d8f":"2px solid transparent",background:chips===c?"#f0fdfa":"#f2f2f2",color:chips===c?"#2a9d8f":"#555",fontWeight:700,fontSize:12,cursor:"pointer"}}>{c}</button>)}</div>
+          <div style={{display:"flex",gap:8,marginBottom:8}}>{[100,200,500,1000,2000].map(c=><button key={c} onClick={()=>setChips(c)} style={{flex:1,padding:"9px 2px",borderRadius:10,border:chips===c?"2px solid #2a9d8f":"2px solid transparent",background:chips===c?"#f0fdfa":"#f2f2f2",color:chips===c?"#2a9d8f":"#555",fontWeight:700,fontSize:12,cursor:"pointer"}}>{c}</button>)}</div>
+          <input type="number" min="10" placeholder="Custom chip count..." value={[100,200,500,1000,2000].includes(chips)?"":(chips||"")} onChange={e=>e.target.value&&setChips(Number(e.target.value))} style={{width:"100%",padding:"9px 12px",borderRadius:10,border:"1.5px solid #99f6e4",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
         </Card>
         <Btn primary disabled={!ok} onClick={()=>onStart({id:Date.now(),type:"poker",name,players:players.slice(0,n),sb,bb,chipStart:chips,dealerIdx:0,rounds:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),finished:false})} style={{background:"#2a9d8f"}}>Start Game →</Btn>
       </div>
@@ -2869,9 +2905,10 @@ function RummySetup({ onBack, onStart }) {
         </Card>
         <Card>
           <Lbl>Elimination Score</Lbl>
-          <div style={{ display: "flex", gap: 8 }}>
-            {[100, 200, 500].map(c => <button key={c} onClick={() => setD(g => ({ ...g, targetScore: c }))} style={{ flex: 1, padding: "10px 4px", borderRadius: 12, border: d.targetScore === c ? "2px solid #f15bb5" : "2px solid transparent", background: d.targetScore === c ? "#fff0f8" : "#f2f2f2", color: d.targetScore === c ? "#f15bb5" : "#555", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{c} pts</button>)}
+          <div style={{display:"flex",gap:8,marginBottom:8}}>
+            {[100,200,500].map(c=><button key={c} onClick={()=>setD(g=>({...g,targetScore:c}))} style={{flex:1,padding:"10px 4px",borderRadius:12,border:d.targetScore===c?"2px solid #f15bb5":"2px solid transparent",background:d.targetScore===c?"#fff0f8":"#f2f2f2",color:d.targetScore===c?"#f15bb5":"#555",fontWeight:700,fontSize:13,cursor:"pointer"}}>{c}</button>)}
           </div>
+          <input type="number" min="50" placeholder="Custom score..." value={[100,200,500].includes(d.targetScore)?"":(d.targetScore||"")} onChange={e=>e.target.value&&setD(g=>({...g,targetScore:Number(e.target.value)}))} style={{width:"100%",padding:"9px 12px",borderRadius:10,border:"1.5px solid #fbcfe8",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
         </Card>
         <Btn primary disabled={!ok} onClick={() => onStart({ ...d, players: d.players.slice(0, n), id: Date.now() })} style={{ background: "#f15bb5" }}>Start Game →</Btn>
       </div>
