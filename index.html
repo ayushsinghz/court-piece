@@ -2698,7 +2698,7 @@ function TPGame({game,hand,setHand,onSubmit,onHistory,onRules,onEnd,onHome,showT
       </div>
 
       {/* Dealer — rotates automatically each hand */}
-      <div style={{margin:"9px 20px 0",padding:"0 0 0 0"}}><ShufflerCard players={p} value={p[Number(h.dealerIdx)||0]} onChange={(v)=>{const idx=p.indexOf(v);if(idx>=0){const nh={...h,dealerIdx:idx};setHand(nh);}}} lang={lang}/></div>
+      <div style={{margin:"9px 20px 0",padding:"0 0 0 0"}}><ShufflerCard players={p} value={p[Number(h.dealerIdx)||0]} onChange={(v)=>{const idx=p.indexOf(v);if(idx>=0){setHand(makePokerHand(p,sb,bb,idx));}}} lang={lang}/></div>
       {/* Pot */}
       <div style={{margin:"9px 20px 0",background:"#fff8e1",borderRadius:13,padding:"9px 15px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <span style={{fontSize:13,color:"#856404",fontWeight:600}}>🪙 Pot</span>
@@ -3176,7 +3176,7 @@ function PokerGame({game,hand,setHand,onSubmit,onHistory,onRules,onEnd,onHome,sh
       </div>
 
       {/* Dealer — rotates automatically each hand */}
-      <div style={{margin:"9px 20px 0",padding:"0 0 0 0"}}><ShufflerCard players={p} value={p[Number(h.dealerIdx)||0]} onChange={(v)=>{const idx=p.indexOf(v);if(idx>=0){const nh={...h,dealerIdx:idx};setHand(nh);}}} lang={lang}/></div>
+      <div style={{margin:"9px 20px 0",padding:"0 0 0 0"}}><ShufflerCard players={p} value={p[Number(h.dealerIdx)||0]} onChange={(v)=>{const idx=p.indexOf(v);if(idx>=0){setHand(makePokerHand(p,sb,bb,idx));}}} lang={lang}/></div>
       {/* Street + Pot */}
       <div style={{margin:"9px 20px 0",display:"flex",gap:8}}>
         <div style={{display:"flex",gap:4,flex:1}}>
