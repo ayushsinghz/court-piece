@@ -181,6 +181,8 @@ function App(){
   const[screen,setScreen]=useState("home");
   const[cpRound,setCPRound]=useState(newCPRound());
   const[ttfRound,setTTFRound]=useState(newTTFRound());
+  const[tpHand,setTPHand]=useState(null);
+  const[pokerHand,setPokerHand]=useState(null);
   const[toast,setToast]=useState(null);
   const[lang,setLR]=useState(()=>load(LK)||"en");
 
@@ -288,19 +290,20 @@ function App(){
         onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang}/>}
       {screen==="g28:history"&&game&&<G28History game={game} onBack={()=>setScreen("g28:game")}/>}
       {screen==="g28:rules"&&<G28Rules onBack={()=>setScreen(game?"g28:game":"home")}/>}
-      {screen==="g28:share"&&game&&<GenericShare game={game} scores={calc28Scores(game.rounds)} onBack={()=>setScreen("g28:game")} showToast={showToast} label="28" color="#f4a261"/>}
+      {screen==="g28:share"&&game&&<GenericShare game={game} scores={calc28Scores(game.rounds).map(s=>s.sets+" sets, "+s.score+" pts")} onBack={()=>setScreen("g28:game")} showToast={showToast} label="28" color="#f4a261"/>}
       {screen==="g28:editTeams"&&game&&<CPEditTeams teams={game.teams} onBack={()=>setScreen("g28:game")} onSave={t=>{upd({teams:t});setScreen("g28:game");showToast("Updated!");}}/>}
-      {screen==="g28:dash"&&game&&<GenericDashboard game={game} onBack={()=>setScreen("g28:game")} showToast={showToast} label="28" color="#f4a261" getScores={g=>calc28Scores(g.rounds)} getPlayers={g=>[g.teams[0].name,g.teams[1].name]}/>}
+      {screen==="g28:dash"&&game&&<G28Dashboard game={game} onBack={()=>setScreen("g28:game")} showToast={showToast}/>}
 
       {/* ── Teen Patti ── */}
       {screen==="tp:setup"&&<TPSetup onBack={()=>setScreen("home")}
         onStart={g=>{setGames(gs=>[...gs,g]);setActiveId(g.id);setScreen("tp:game")}}/>}
       {screen==="tp:game"&&game&&game.type==="tp"&&<TPGame game={game}
-        onSubmit={nr=>{upd({rounds:[...game.rounds,nr],dealerIdx:((nr.dealerIdx||0)+1)%game.players.length});showToast("Hand "+(game.rounds.length+1)+" recorded!");}}
+        hand={tpHand} setHand={setTPHand}
+        onSubmit={nr=>{upd({rounds:[...game.rounds,nr],dealerIdx:((nr.dealerIdx||0)+1)%game.players.length});setTPHand(null);showToast("Hand "+(game.rounds.length+1)+" recorded!");}}
         onHistory={()=>setScreen("tp:history")} onRules={()=>setScreen("tp:rules")}
         onShare={()=>setScreen("tp:share")} onDash={()=>setScreen("tp:dash")}
         onEditPlayers={()=>setScreen("tp:editPlayers")} onUndo={undoLastRound}
-        onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
+        onEnd={()=>{upd({finished:true});setTPHand(null);setScreen("home");showToast("Saved!")}}
         onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang}/>}
       {screen==="tp:history"&&game&&<TPHistory game={game} onBack={()=>setScreen("tp:game")} onShare={()=>setScreen("tp:share")} color="#9b5de5" label="TEEN PATTI"/>}
       {screen==="tp:rules"&&<TeenPattiRules onBack={()=>setScreen(game?"tp:game":"home")}/>}
@@ -312,11 +315,12 @@ function App(){
       {screen==="poker:setup"&&<PokerSetup onBack={()=>setScreen("home")}
         onStart={g=>{setGames(gs=>[...gs,g]);setActiveId(g.id);setScreen("poker:game")}}/>}
       {screen==="poker:game"&&game&&game.type==="poker"&&<PokerGame game={game}
-        onSubmit={nr=>{upd({rounds:[...game.rounds,nr],dealerIdx:((nr.dealerIdx||0)+1)%game.players.length});showToast("Hand "+(game.rounds.length+1)+" recorded!");}}
+        hand={pokerHand} setHand={setPokerHand}
+        onSubmit={nr=>{upd({rounds:[...game.rounds,nr],dealerIdx:((nr.dealerIdx||0)+1)%game.players.length});setPokerHand(null);showToast("Hand "+(game.rounds.length+1)+" recorded!");}}
         onHistory={()=>setScreen("poker:history")} onRules={()=>setScreen("poker:rules")}
         onShare={()=>setScreen("poker:share")} onDash={()=>setScreen("poker:dash")}
         onEditPlayers={()=>setScreen("poker:editPlayers")} onUndo={undoLastRound}
-        onEnd={()=>{upd({finished:true});setScreen("home");showToast("Saved!")}}
+        onEnd={()=>{upd({finished:true});setPokerHand(null);setScreen("home");showToast("Saved!")}}
         onHome={()=>setScreen("home")} showToast={showToast} lang={lang} setLang={setLang}/>}
       {screen==="poker:history"&&game&&<PokerHistory game={game} onBack={()=>setScreen("poker:game")} onShare={()=>setScreen("poker:share")}/>}
       {screen==="poker:rules"&&<PokerRules onBack={()=>setScreen(game?"poker:game":"home")}/>}
@@ -628,7 +632,7 @@ function getGameScore(g){
   if(g.type==="cp")return calcCPScores(g.rounds).join(" – ");
   if(g.type==="ttf")return calcTTFScores(g.rounds).map((s,i)=>(s>=0?"+":"")+s).join(" | ");
   if(g.type==="uno")return calcUNOScores(g.rounds).join(" – ");
-  if(g.type==="g28")return calc28Scores(g.rounds).join(" – ");
+  if(g.type==="g28"){const s28=calc28Scores(g.rounds);return g.teams[0].name+": "+s28[0].score+"pts "+s28[0].sets+"sets | "+g.teams[1].name+": "+s28[1].score+"pts "+s28[1].sets+"sets";}
   if(g.type==="tp"||g.type==="poker"){const p=g.players;return p.map((_,i)=>Number(g.chipStart)+g.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||r.deltas?.[i]||0),0)).join(" | ");}
   if(g.type==="rummy")return g.players.map((_,i)=>g.rounds.reduce((a,r)=>a+(r.scores?.[i]||0),0)).join(" – ");
   return "—";
@@ -1559,13 +1563,19 @@ function UNOGame({ game, onSubmit, onHistory, onShare, onRules, onEnd, onHome, s
   const rn = game.rounds.length + 1;
   const p = game.players;
   const [winner, setWinner] = useState(0);
+  const [dealer, setDealer] = useState(null);
   const [pts, setPts] = useState(p.map(() => ""));
   const COLORS = ["#e63946", "#f4a261", "#2a9d8f", "#4a7cfc", "#9b5de5", "#f15bb5", "#00bbf9", "#fee440", "#06d6a0", "#fb8500"];
 
   const submit = () => {
-    // Winner gets 0 points. Each loser gets their own card points added to their score.
     const roundScores = p.map((_, i) => i === winner ? 0 : (Number(pts[i]) || 0));
     onSubmit({ winner, winnerName: p[winner], cardPts: pts.map(Number), scores: roundScores, ts: new Date().toISOString() });
+    // Voice result
+    const losers=p.filter((_,i)=>i!==winner);
+    const spk=lang==="hi"
+      ?p[winner]+" ne UNO kiya! "+losers.map((l,i)=>{const li=p.indexOf(l);return l+": "+roundScores[li]+" points";}).join(". ")+"."
+      :p[winner]+" calls UNO and wins the round! "+losers.map((l,i)=>{const li=p.indexOf(l);return l+" gets "+roundScores[li]+" points";}).join(". ")+".";
+    speak(spk,lang||"en",null);
     setPts(p.map(() => ""));
     setWinner(0);
   };
@@ -1634,6 +1644,7 @@ function UNOGame({ game, onSubmit, onHistory, onShare, onRules, onEnd, onHome, s
             <strong>Card values:</strong> 0-9 = face value · Skip/Rev/+2 = 20 pts · Wild/+4 = 50 pts
           </div>
         </Card>
+        <ShufflerCard players={p} value={dealer} onChange={setDealer} lang={lang}/>
         <Btn primary disabled={!canSubmit} onClick={submit} style={{ background: "#e63946" }}>Record Round {rn}</Btn>
         <div style={{display:"flex",gap:8}}>
           <button onClick={onShare} style={{...SB,flex:1}}>📤 Share</button>
@@ -1776,275 +1787,12 @@ function UNOHistory({ game, onBack, onShare }) {
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ── 28 CARD GAME ──────────────────────────════════════════════════════════════
-// ══════════════════════════════════════════════════════════════════════════════
-const new28Game = () => ({
-  id: Date.now(), type: "g28", name: "",
-  teams: [{ name: "Team A", players: ["", ""] }, { name: "Team B", players: ["", ""] }],
-  rounds: [],
-  createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), finished: false
-});
-
-const calc28Scores = rounds => rounds.reduce((a, r) => [a[0] + (r.pts?.[0] || 0), a[1] + (r.pts?.[1] || 0)], [0, 0]);
-
-function G28Setup({ onBack, onStart }) {
-  const [d, setD] = useState(new28Game);
-  const st = (ti, f, v) => setD(g => { const t = JSON.parse(JSON.stringify(g.teams)); if (f === "name") t[ti].name = v; else t[ti].players[f] = v; return { ...g, teams: t }; });
-  const ok = d.teams[0].name.trim() && d.teams[1].name.trim() && d.teams.every(t => t.players.every(p => p.trim()));
-  return (
-    <div style={{ padding: "48px 20px 40px" }}>
-      <button onClick={onBack} style={BK}>← Back</button>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: "#f4a261", borderRadius: 8, padding: "3px 10px" }}>28</span>
-        <h1 style={PT}>New Game</h1>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <Card><Lbl>Game Name <M>(optional)</M></Lbl><Inp value={d.name} placeholder="e.g. Sunday Game" onChange={v => setD(g => ({ ...g, name: v }))} /></Card>
-        {[0, 1].map(ti => (
-          <Card key={ti}><Lbl>Team {ti + 1}</Lbl>
-            <Inp bold value={d.teams[ti].name} placeholder={`Team ${ti + 1} name`} onChange={v => st(ti, "name", v)} />
-            <div style={{ height: 10 }} />
-            {[0, 1].map(pi => <div key={pi} style={{ marginBottom: pi === 0 ? 8 : 0 }}><Inp value={d.teams[ti].players[pi]} placeholder={`Player ${pi + 1}`} onChange={v => st(ti, pi, v)} /></div>)}
-          </Card>
-        ))}
-        <Btn primary disabled={!ok} onClick={() => onStart({ ...d, id: Date.now() })} style={{ background: "#f4a261", color: "white" }}>Start Game →</Btn>
-      </div>
-    </div>
-  );
-}
-
-function G28Game({ game, onSubmit, onHistory, onRules, onEnd, onHome, showToast }) {
-  const scores = calc28Scores(game.rounds);
-  const rn = game.rounds.length + 1;
-  const t = game.teams;
-  const [bid, setBid] = useState("");
-  const [bidTeam, setBidTeam] = useState(0);
-  const [trump, setTrump] = useState(null);
-  const [tricksWon, setTricksWon] = useState(["", ""]);
-  const C0 = "#f4a261", C1 = "#4a7cfc";
-  const totalTricks = Number(tricksWon[0]) + Number(tricksWon[1]);
-  const bidNum = Number(bid);
-  const canSubmit = bid && tricksWon[0] !== "" && tricksWon[1] !== "" && totalTricks === 8;
-
-  const submit = () => {
-    const bidderWon = Number(tricksWon[bidTeam]) >= bidNum;
-    // Bidder makes: get points = bid; opponent gets 8-bid
-    // Bidder fails: opponent gets bid+extra
-    let pts = [0, 0];
-    if (bidderWon) {
-      pts[bidTeam] = bidNum;
-      pts[1 - bidTeam] = 8 - bidNum;
-    } else {
-      pts[1 - bidTeam] = bidNum;
-      pts[bidTeam] = -(bidNum);
-    }
-    onSubmit({ bid: bidNum, bidTeam, trump, tricksWon: [Number(tricksWon[0]), Number(tricksWon[1])], bidderWon, pts, ts: new Date().toISOString() });
-    setBid(""); setBidTeam(0); setTrump(null); setTricksWon(["", ""]);
-  };
-
-  return (
-    <div>
-      <div style={{ padding: "48px 20px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div style={{ flex: 1 }}>
-          <button onClick={onHome} style={BK}>← Games</button>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: C0, borderRadius: 6, padding: "2px 8px" }}>28</span>
-            <h1 style={{ ...PT, fontSize: 18, margin: 0 }}>{game.name || t[0].name + " vs " + t[1].name}</h1>
-          </div>
-          <p style={{ margin: "2px 0 0", color: "#bbb", fontSize: 12 }}>Round {rn}</p>
-        </div>
-        <div style={{ display: "flex", gap: 6, paddingTop: 28 }}>
-          <Pill onClick={onEditPlayers}>✏️</Pill>
-          <Pill onClick={onRules}>📖</Pill>
-          <Pill onClick={onHistory}>History</Pill>
-        </div>
-      </div>
-      <div style={{ margin: "13px 20px 0", display: "flex", gap: 10 }}>
-        {[0, 1].map(i => (
-          <div key={i} style={{ flex: 1, background: "white", borderRadius: 14, padding: "13px 10px", textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <div style={{ fontSize: 11, color: i === 0 ? C0 : C1, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>{t[i].name}</div>
-            <div style={{ fontSize: 36, fontWeight: 900, color: scores[i] < 0 ? "#e63946" : "#111", lineHeight: 1 }}>{scores[i]}</div>
-            <div style={{ fontSize: 11, color: "#bbb", marginTop: 3 }}>{t[i].players.join(" & ")}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ padding: "13px 20px 40px", display: "flex", flexDirection: "column", gap: 13 }}>
-        <Card>
-          <Lbl>Trump Suit <M>(optional)</M></Lbl>
-          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-            {SUITS.map(s => { const sel = trump === s, red = RED.has(s); return <button key={s} onClick={() => setTrump(sel ? null : s)} style={{ width: 52, height: 52, borderRadius: 13, fontSize: 24, cursor: "pointer", background: sel ? (red ? "#fff0f0" : "#fff8e1") : "#f7f7f7", border: sel ? "2px solid " + (red ? "#e63946" : "#f4a261") : "2px solid #ebebeb", color: red ? "#e63946" : "#1a1a2e", transform: sel ? "scale(1.1)" : "scale(1)", transition: "all 0.15s" }}>{s}</button>; })}
-          </div>
-        </Card>
-        <Card>
-          <Lbl>Bid</Lbl>
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            {[0, 1].map(i => <button key={i} onClick={() => setBidTeam(i)} style={{ flex: 1, padding: "10px", borderRadius: 12, border: bidTeam === i ? "2px solid " + (i === 0 ? C0 : C1) : "2px solid transparent", background: bidTeam === i ? (i === 0 ? "#fff4ec" : "#f0f5ff") : "#f7f7f7", fontWeight: 700, fontSize: 13, color: bidTeam === i ? (i === 0 ? C0 : C1) : "#555", cursor: "pointer" }}>{t[i].name} bids</button>)}
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
-            {[15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28].map(n => {
-              const sel = bid === String(n);
-              return <button key={n} onClick={() => setBid(sel ? "" : String(n))} style={{ width: 42, height: 38, borderRadius: 10, fontSize: 14, fontWeight: sel ? 800 : 500, background: sel ? C0 : "#f2f2f2", color: sel ? "white" : "#333", border: sel ? "2px solid " + C0 : "2px solid transparent", cursor: "pointer" }}>{n}</button>;
-            })}
-          </div>
-        </Card>
-        <Card>
-          <Lbl>Tricks Won <M>(must total 8)</M></Lbl>
-          <div style={{ display: "flex", gap: 12 }}>
-            {[0, 1].map(ti => (
-              <div key={ti} style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, color: ti === 0 ? C0 : C1, fontWeight: 700, textAlign: "center", marginBottom: 8 }}>{t[ti].name}</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center" }}>
-                  {[...Array(9)].map((_, n) => {
-                    const ov = tricksWon[1 - ti] !== "" ? Number(tricksWon[1 - ti]) : null;
-                    const dis = ov !== null && n + ov > 8;
-                    const sel = tricksWon[ti] === String(n);
-                    return <button key={n} disabled={dis} onClick={() => { const x = [...tricksWon]; x[ti] = String(n); x[1 - ti] = String(8 - n); setTricksWon(x); }} style={{ width: 34, height: 34, borderRadius: 9, fontSize: 13, cursor: dis ? "not-allowed" : "pointer", fontWeight: sel ? 800 : 500, background: sel ? (ti === 0 ? C0 : C1) : dis ? "#fafafa" : "#f2f2f2", color: sel ? "white" : dis ? "#ccc" : "#333", border: sel ? "2px solid " + (ti === 0 ? C0 : C1) : "2px solid transparent" }}>{n}</button>;
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-          {totalTricks > 0 && totalTricks !== 8 && <div style={{ marginTop: 8, color: "#e63946", fontSize: 12, textAlign: "center", fontWeight: 600 }}>⚠ Must total 8</div>}
-        </Card>
-        <Btn primary disabled={!canSubmit} onClick={submit} style={{ background: C0, color: "white" }}>Record Round {rn}</Btn>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => { if (window.confirm("End game?")) onEnd(); }} style={SB}>🏁 End</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function G28Rules({ onBack }) {
-  return (
-    <div style={{ padding: "48px 20px 40px" }}>
-      <button onClick={onBack} style={BK}>← Back</button>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-        <span style={{ fontSize: 22 }}>🃏</span>
-        <h1 style={{ ...PT, color: "#f4a261" }}>28 Rules</h1>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <Card><div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 6 }}>🎯 Objective</div><p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>2 teams of 2. Win tricks to score points. The team that bids must meet their bid to score. First team to a pre-agreed score (usually 6 game points) wins.</p></Card>
-        <Card><div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 6 }}>🃏 Deck & Card Values</div>
-          <p style={{ fontSize: 13, color: "#555", marginBottom: 8 }}>32 cards: 7, 8, 9, 10, J, Q, K, A of all 4 suits. <strong>Total = 28 points.</strong></p>
-          {[["J", "3 pts"], ["9", "2 pts"], ["A", "1 pt"], ["10", "1 pt"], ["K/Q/8/7", "0 pts"]].map(([c, v]) => (
-            <div key={c} style={{ display: "flex", justifyContent: "space-between", padding: "6px 10px", background: "#f9f9f9", borderRadius: 9, marginBottom: 4 }}>
-              <span style={{ fontSize: 13, fontWeight: 700 }}>{c}</span><span style={{ fontSize: 13, color: "#555" }}>{v}</span>
-            </div>
-          ))}
-        </Card>
-        <Card><div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 6 }}>🔢 Bidding</div><p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>Each player is dealt 4 cards. Players bid how many points their team will make. Bid must be between 15–28. Highest bid wins and sets the trump suit secretly. Remaining cards are then dealt (4 more each).</p></Card>
-        <Card><div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 6 }}>▶️ Gameplay</div><p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>8 tricks total. Must follow suit. Trump revealed when a player can't follow suit. Highest trump wins; else highest card of led suit wins. Partners sit opposite each other.</p></Card>
-        <Card><div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 6 }}>🏆 Scoring</div><p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>• Bidding team makes their bid → score 1 game point; opponents score 0<br />• Bidding team fails → opponents score 1 game point (or 2 if bid was high)<br />• If bid = 28 and made → bidding team scores 4 game points<br />• First team to 6 game points wins the match</p></Card>
-      </div>
-    </div>
-  );
-}
-
-function G28History({ game, onBack }) {
-  const t = game.teams;
-  const scores = calc28Scores(game.rounds);
-  return (
-    <div style={{ padding: "48px 20px 40px" }}>
-      <button onClick={onBack} style={BK}>← Back</button>
-      <h1 style={PT}>Round History</h1>
-      <p style={{ margin: "2px 0 14px", color: "#999", fontSize: 13 }}>{game.rounds.length} rounds · Score: {t[0].name} {scores[0]} – {scores[1]} {t[1].name}</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-        {[...game.rounds].reverse().map((r, i) => {
-          const ri = game.rounds.length - i;
-          return (
-            <div key={i} style={{ background: "#f7f7f7", borderRadius: 14, padding: "13px 15px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: 11, color: "#999", fontWeight: 600 }}>Rd {ri}</span>
-                <span style={{ fontSize: 11, color: r.trump ? (RED.has(r.trump) ? "#e63946" : "#333") : "#aaa" }}>{r.trump || "No trump"}</span>
-                {r.ts && <span style={{ fontSize: 10, color: "#ccc" }}>{fmt(r.ts)}</span>}
-              </div>
-              <div style={{ fontSize: 13, color: "#333", marginBottom: 4 }}>
-                <strong>{t[r.bidTeam]?.name}</strong> bid <strong>{r.bid}</strong> — {r.bidderWon ? "✅ Made it" : "❌ Failed"}
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {[0, 1].map(j => <div key={j} style={{ flex: 1, background: "white", borderRadius: 9, padding: "6px", textAlign: "center" }}><div style={{ fontSize: 11, color: "#888" }}>{t[j].name}</div><div style={{ fontSize: 16, fontWeight: 800, color: r.pts?.[j] < 0 ? "#e63946" : "#16a34a" }}>{r.pts?.[j] >= 0 ? "+" : ""}{r.pts?.[j] ?? 0}</div></div>)}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ── RULES-ONLY GAMES (Teen Patti, Poker, Rummy) ────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════════
-// These games have chip/cash-based scoring that varies widely by format.
-// We provide full instructions + score tracker (each player's chip count).
-
-const newTPGame = () => ({ id: Date.now(), type: "tp", name: "", players: ["", "", ""], chipStart: 100, rounds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), finished: false });
-const newPokerGame = () => ({ id: Date.now(), type: "poker", name: "", players: ["", "", ""], chipStart: 100, rounds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), finished: false });
-const newRummyGame = () => ({ id: Date.now(), type: "rummy", name: "", players: ["", "", ""], rounds: [], targetScore: 100, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), finished: false });
-
-// Generic chip-based game setup
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ── TEEN PATTI — Interactive Engine ──────────────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════════
-// Rules: 3-6 players. Boot (ante) collected. Each player blind or seen.
-// Blind bet = current stake. Seen bet = 2x current stake.
-// Actions: Blind, Seen, Chaal, Raise, Fold, Show, Sideshow
-
-const TP_ACTIONS = ["Blind","Seen","Chaal","Raise","Fold","Show","Sideshow"];
-const TP_COLORS = { Blind:"#9b5de5", Seen:"#4a7cfc", Chaal:"#16a34a", Raise:"#f4a261", Fold:"#e63946", Show:"#2a9d8f", Sideshow:"#f15bb5" };
-
-function newTPHand(players, boot, dealerIdx) {
-  return {
-    id: Date.now(),
-    boot,
-    dealerIdx,
-    pot: players.length * boot,
-    currentStake: boot,
-    actions: [], // {player, action, amount, ts}
-    status: "active", // active | finished
-    winner: null,
-    playerStatus: players.map(() => "blind"), // blind | seen | folded | out
-    chipChanges: players.map(() => -boot),
-    ts: new Date().toISOString(),
-  };
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ── TEEN PATTI — Interactive Engine ──────────────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════════
-
-const TP_C = {Blind:"#9b5de5",Seen:"#4a7cfc",Chaal:"#16a34a",Raise:"#f4a261",Fold:"#e63946",Show:"#2a9d8f",Sideshow:"#f15bb5"};
-
-function makeTPHand(players, boot, dealerIdx) {
-  const di = Number(dealerIdx) || 0;
-  const b = Number(boot) || 2;
-  return {
-    pot: players.length * b,
-    stake: b,
-    dealerIdx: di,
-    actions: [],
-    status: "active",
-    winner: null,
-    pStatus: players.map(() => "blind"),
-    changes: players.map(() => -b),
-  };
-}
-
 // ── Score speech helpers ──────────────────────────────────────────────────────
-function unoScoreSpeech(game,lang){
-  const sc=calcUNOScores(game.rounds);const p=game.players;
-  const lo=sc.indexOf(Math.min(...sc));
-  if(lang==="hi")return"UNO score. "+p.map((pl,i)=>pl+": "+sc[i]+" point").join(". ")+". "+p[lo]+" aage hai.";
-  return"UNO scores. "+p.map((pl,i)=>pl+": "+sc[i]).join(", ")+". "+p[lo]+" is leading.";
-}
 function g28ScoreSpeech(game,lang){
-  const sc=calc28Scores(game.rounds);const t=game.teams;
-  const diff=Math.abs(sc[0]-sc[1]);const lead=sc[0]>sc[1]?0:sc[1]>sc[0]?1:-1;
-  if(lang==="hi")return"28 ka score. "+t[0].name+": "+sc[0]+". "+t[1].name+": "+sc[1]+"."+(lead===-1?" Barabar.": " "+t[lead].name+" "+diff+" aage.");
-  return"28 scores. "+t[0].name+": "+sc[0]+". "+t[1].name+": "+sc[1]+"."+(lead===-1?" Level.":" "+t[lead].name+" leads by "+diff+".");
+  const st=calc28Scores(game.rounds);const t=game.teams;
+  const sc0=st[0].score, sc1=st[1].score, sets0=st[0].sets, sets1=st[1].sets;
+  if(lang==="hi")return"28 ka score. "+t[0].name+": "+sc0+" points, "+sets0+" set. "+t[1].name+": "+sc1+" points, "+sets1+" set.";
+  return"28 scores. "+t[0].name+": "+sc0+" pts, "+sets0+" sets. "+t[1].name+": "+sc1+" pts, "+sets1+" sets.";
 }
 function chipScoreSpeech(game,label,lang){
   const p=game.players;
@@ -2059,6 +1807,700 @@ function rummyScoreSpeech(game,lang){
   const lo=sc.indexOf(Math.min(...sc));
   if(lang==="hi")return"Rummy score. "+p.map((pl,i)=>pl+": "+sc[i]+" point").join(". ")+". "+p[lo]+" best position mein.";
   return"Rummy scores. "+p.map((pl,i)=>pl+": "+sc[i]).join(", ")+". "+p[lo]+" is in the best position.";
+}
+
+// ── TP/Poker constants ────────────────────────────────────────────────────────
+const TP_C = {Blind:"#9b5de5",Seen:"#4a7cfc",Chaal:"#16a34a",Raise:"#f4a261",Fold:"#e63946",Show:"#2a9d8f",Sideshow:"#f15bb5"};
+
+// ── TP/Poker hand factories ───────────────────────────────────────────────────
+function makeTPHand(players, boot, dealerIdx) {
+  const di = Number(dealerIdx) || 0;
+  const b = Number(boot) || 2;
+  return {
+    pot: players.length * b, stake: b, dealerIdx: di,
+    actions: [], status: "active", winner: null, sideshowPlayers: null,
+    pStatus: players.map(() => "blind"),
+    changes: players.map(() => -b),
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── 28 CARD GAME ──────────────────────────════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// Rules: 4 players, 2 teams (partners sit opposite). 32 cards (7-A of 4 suits).
+// Card points: J=3, 9=2, A=1, 10=1, K/Q/8/7=0. Total = 28 points.
+// Bidding: each player gets 4 cards. Bid is points (16-28). Highest bid wins.
+// Bidder names trump secretly. Remaining 4 cards dealt. 8 tricks played.
+// Bidding team must meet/exceed bid to score.
+
+const new28Game = () => ({
+  id: Date.now(), type: "g28", name: "",
+  teams: [
+    { name: "Team A", players: ["", ""] },
+    { name: "Team B", players: ["", ""] }
+  ],
+  rounds: [],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  finished: false
+});
+
+const calc28Scores = rounds => {
+  // Returns [{score, sets}, {score, sets}] per team
+  // score: current pts within set (-5 to +5), resets to 0 on crossing ±6
+  // sets: net set count (+1 per +6 crossing, -1 per -6 crossing)
+  // Negative score alone does NOT change sets
+  const state = [{score:0, sets:0}, {score:0, sets:0}];
+  for (const r of rounds) {
+    const gp = r.gamePoints || [0, 0];
+    for (let i = 0; i < 2; i++) {
+      const delta = gp[i] || 0;
+      if (delta === 0) continue;
+      state[i].score += delta;
+      // Only boundary crossings change sets
+      if (state[i].score >= 6) {
+        state[i].sets += 1;
+        state[i].score = 0;
+      } else if (state[i].score <= -6) {
+        state[i].sets -= 1;
+        state[i].score = 0;
+      }
+    }
+  }
+  return state;
+};
+
+const CARD_POINTS_28 = { J: 3, 9: 2, A: 1, 10: 1, K: 0, Q: 0, 8: 0, 7: 0 };
+
+function G28Setup({ onBack, onStart }) {
+  const [d, setD] = useState(new28Game);
+  const st = (ti, f, v) => setD(g => {
+    const t = JSON.parse(JSON.stringify(g.teams));
+    if (f === "name") t[ti].name = v; else t[ti].players[f] = v;
+    return { ...g, teams: t };
+  });
+  const ok = d.teams[0].name.trim() && d.teams[1].name.trim() &&
+    d.teams.every(t => t.players.every(p => p.trim()));
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: "#f4a261", borderRadius: 8, padding: "3px 10px" }}>28</span>
+        <h1 style={PT}>New Game</h1>
+      </div>
+      <div style={{ background: "#fff7f0", border: "1px solid #fed7aa", borderRadius: 14, padding: "11px 14px", marginBottom: 16, fontSize: 13, color: "#9a3412", lineHeight: 1.6 }}>
+        <strong>28 Rules:</strong> 4 players, 2 teams. 32 cards (7–A). J=3pts, 9=2pts, A=1pt, 10=1pt, others=0. Total 28 points. Bid 16–28, meet your bid to score.
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Card><Lbl>Game Name <M>(optional)</M></Lbl><Inp value={d.name} placeholder="e.g. Sunday Game" onChange={v => setD(g => ({ ...g, name: v }))} /></Card>
+        {[0, 1].map(ti => (
+          <Card key={ti}>
+            <Lbl>Team {ti + 1}</Lbl>
+            <Inp bold value={d.teams[ti].name} placeholder={`Team ${ti + 1} name`} onChange={v => st(ti, "name", v)} />
+            <div style={{ height: 10 }} />
+            {[0, 1].map(pi => (
+              <div key={pi} style={{ marginBottom: pi === 0 ? 8 : 0 }}>
+                <Inp value={d.teams[ti].players[pi]} placeholder={`Player ${pi + 1}`} onChange={v => st(ti, pi, v)} />
+              </div>
+            ))}
+          </Card>
+        ))}
+        <Btn primary disabled={!ok} onClick={() => onStart({ ...d, id: Date.now() })} style={{ background: "#f4a261", color: "white" }}>Start Game →</Btn>
+      </div>
+    </div>
+  );
+}
+
+function G28Game({ game, onSubmit, onHistory, onRules, onEnd, onHome, showToast, onShare, onDash, onEditTeams, lang, setLang, onUndo }) {
+  const scores = calc28Scores(game.rounds); // raw cumulative
+  const rn = game.rounds.length + 1;
+  const t = game.teams;
+  const C0 = "#f4a261", C1 = "#4a7cfc";
+  const allPlayers = [...t[0].players, ...t[1].players];
+
+  // Phases: bid4 (4 cards: bid + double/redouble) | play (8 cards: single, pair, result)
+  const [phase, setPhase] = useState("bid4");
+  const [bidTeam, setBidTeam] = useState(0);
+  const [bid, setBid] = useState("");
+  const [customBid, setCustomBid] = useState("");
+  // Special rules — mutually exclusive (single > redouble > double > allHand > normal)
+  const [special, setSpecial] = useState("none"); // "none"|"double"|"redouble"|"single"|"allhand"
+  // Pair declared during play after trump revealed
+  const [pairTeam, setPairTeam] = useState(null); // bidTeam | 1-bidTeam | null
+  // Result recording
+  const [bidPts, setBidPts] = useState(""); // bidder's points (for normal rounds)
+  const [wonAllTricks, setWonAllTricks] = useState(null); // true/false for cot/single/allhand
+  const [dealer, setDealer] = useState(null);
+
+  const resetRound = () => {
+    setPhase("bid4"); setBidTeam(0); setBid(""); setCustomBid("");
+    setSpecial("none"); setPairTeam(null); setBidPts(""); setWonAllTricks(null);
+  };
+
+  const bidNum = Number(bid || customBid);
+  const isCot = bidNum === 28;
+
+  // Pair target adjustment:
+  // bidder pair + bid>=19: target -3; bidder pair + bid<19: target +4 (penalty)
+  // defender pair: always target +4
+  const getPairAdj = () => {
+    if (pairTeam === null) return 0;
+    if (pairTeam === bidTeam) return bidNum >= 19 ? -3 : 4;
+    return 4; // defender pair: bidder target +4
+  };
+  const pairAdj = getPairAdj();
+  const effectiveBid = bidNum + pairAdj;
+
+  // Scoring (bidder only, defender never changes):
+  // single: ±3 (must win all tricks; overrides all)
+  // allhand/cot (wins all tricks): ±2 (not multiplied)
+  // redouble: ±4
+  // double: ±2
+  // normal: ±1
+  const getBaseScore = () => {
+    if (special === "single") return 3;
+    if (special === "allhand" || isCot) return 2;
+    if (special === "redouble") return 4;
+    if (special === "double") return 2;
+    return 1;
+  };
+  const baseScore = getBaseScore();
+
+  const submit = () => {
+    const opTeam = 1 - bidTeam;
+    let delta = 0;
+    let bidderMade = false;
+
+    if (special === "single") {
+      // Single: must win all tricks for +3, else -3
+      bidderMade = wonAllTricks === true;
+      delta = bidderMade ? 3 : -3;
+    } else if (special === "allhand" || isCot) {
+      // All Hand / Cot: win all tricks = +2, fail = -2
+      bidderMade = wonAllTricks === true;
+      delta = bidderMade ? 2 : -2;
+    } else {
+      // Normal / Double / Redouble: points based
+      bidderMade = Number(bidPts) >= effectiveBid;
+      delta = bidderMade ? baseScore : -baseScore;
+    }
+
+    const gp = [0, 0];
+    gp[bidTeam] = delta;
+    // Defender score never changes
+
+    const spk = lang === "hi"
+      ? (bidderMade ? t[bidTeam].name + " ne jeeta! +" + Math.abs(delta) + " game point." : t[bidTeam].name + " haara! " + delta + " game point.")
+      : (bidderMade ? t[bidTeam].name + " wins! +" + delta + " pts." : t[bidTeam].name + " loses. " + delta + " pts.");
+    speak(spk, lang || "en", null);
+
+    onSubmit({
+      bid: bidNum, bidTeam, dealer, pairTeam, pairAdj, effectiveBid,
+      bidPts: Number(bidPts), special, isCot, wonAllTricks,
+      bidderMade, gamePoints: gp, ts: new Date().toISOString()
+    });
+    resetRound();
+    showToast(bidderMade ? "✅ +" + delta + " for " + t[bidTeam].name : "❌ " + delta + " for " + t[bidTeam].name);
+  };
+
+  // renderScore: raw score → sets + current pts within set
+  const renderScore = (st) => {
+    const sc = st.score, sets = st.sets;
+    const absSets = Math.abs(sets);
+    const isNegSets = sets < 0;
+    return (
+      <div>
+        <div style={{ fontSize: 28, fontWeight: 900, color: sc < 0 ? "#e63946" : "#111", lineHeight: 1 }}>{sc}</div>
+        {absSets > 0 && (
+          <div style={{ display: "flex", gap: 3, justifyContent: "center", marginTop: 4, flexWrap: "wrap" }}>
+            {[...Array(absSets)].map((_, i) => (
+              <div key={i} style={{ width: 18, height: 26, borderRadius: 3, background: isNegSets ? "#1a1a2e" : "#e63946", color: "white", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {Math.max(5 - i, 1)}
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ fontSize: 9, color: "#aaa", marginTop: 2 }}>
+          {absSets > 0 ? (isNegSets?"-":"+")+absSets+" set"+(absSets>1?"s":"")+" · " : ""}{sc} pts
+        </div>
+      </div>
+    );
+  };
+
+  // Can submit?
+  const needsTricksResult = special === "single" || special === "allhand" || isCot;
+  const canSubmit = bidNum >= 16 && bidNum <= 28 && (
+    needsTricksResult ? wonAllTricks !== null : bidPts !== "" && !isNaN(Number(bidPts))
+  );
+
+  // Preview result
+  const previewDelta = () => {
+    if (!canSubmit) return null;
+    let delta = 0, made = false;
+    if (special === "single") { made = wonAllTricks; delta = made ? 3 : -3; }
+    else if (special === "allhand" || isCot) { made = wonAllTricks; delta = made ? 2 : -2; }
+    else { made = Number(bidPts) >= effectiveBid; delta = made ? baseScore : -baseScore; }
+    return { delta, made };
+  };
+  const preview = previewDelta();
+
+
+
+  return (
+    <div>
+      <div style={{ padding: "48px 20px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          <button onClick={onHome} style={BK}>← Games</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: C0, borderRadius: 6, padding: "2px 8px" }}>28</span>
+            <h1 style={{ ...PT, fontSize: 18, margin: 0 }}>{game.name || t[0].name + " vs " + t[1].name}</h1>
+          </div>
+          <p style={{ margin: "2px 0 0", color: "#bbb", fontSize: 12 }}>Round {rn} · {phase === "bid4" ? "Bid phase" : "Play phase"}</p>
+        </div>
+        <div style={{ display: "flex", gap: 5, paddingTop: 28 }}>
+          <Pill onClick={onEditTeams}>✏️</Pill>
+          <Pill onClick={onRules}>📖</Pill>
+          <Pill onClick={onHistory}>History</Pill>
+        </div>
+      </div>
+
+      {/* Scoreboard */}
+      <div style={{ margin: "12px 20px 0", display: "flex", gap: 10 }}>
+        {[0, 1].map(i => (
+          <div key={i} style={{ flex: 1, background: "white", borderRadius: 14, padding: "12px 10px", textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+            <div style={{ fontSize: 11, color: i === 0 ? C0 : C1, fontWeight: 700, textTransform: "uppercase", marginBottom: 2 }}>{t[i].name}</div>
+            {renderScore(scores[i])}
+            <div style={{ fontSize: 9, color: "#ccc", marginTop: 2 }}>{t[i].players.join(" & ")}</div>
+          </div>
+        ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
+          <SpeakBtn text={g28ScoreSpeech(game, lang || "en")} lang={lang || "en"} size={46} />
+          <button onClick={() => setLang && setLang(lang === "en" ? "hi" : "en")} style={{ width: 46, height: 22, background: "#f2f2f2", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 9, fontWeight: 700, color: "#555" }}>{lang === "en" ? "हिंदी" : "ENG"}</button>
+        </div>
+      </div>
+
+      {/* Dealer */}
+      <div style={{ margin: "9px 20px 0" }}>
+        <ShufflerCard players={allPlayers} value={dealer} onChange={setDealer} lang={lang} />
+      </div>
+
+      <div style={{ padding: "10px 20px 40px", display: "flex", flexDirection: "column", gap: 12 }}>
+        {/* Phase tabs */}
+        <div style={{ display: "flex", gap: 4 }}>
+          {[["bid4","1. Bid (4 cards)"],["play","2. Play (8 cards)"]].map(([ph,label]) => (
+            <div key={ph} style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: 9, background: phase === ph ? C0 : phase === "play" && ph === "bid4" ? "#fff7f0" : "#f2f2f2", color: phase === ph ? "white" : phase === "play" && ph === "bid4" ? C0 : "#aaa", fontSize: 10, fontWeight: 700 }}>{label}</div>
+          ))}
+        </div>
+
+        {/* PHASE 1: BID (4 cards) */}
+        {phase === "bid4" && (<>
+          <Card>
+            <Lbl>Bidding Team</Lbl>
+            <div style={{ display: "flex", gap: 8 }}>
+              {[0,1].map(i => (
+                <button key={i} onClick={() => setBidTeam(i)} style={{ flex: 1, padding: "11px 8px", borderRadius: 12, border: bidTeam === i ? "2px solid "+(i===0?C0:C1) : "2px solid transparent", background: bidTeam === i ? (i===0?"#fff4ec":"#f0f5ff") : "#f7f7f7", fontWeight: 700, fontSize: 13, color: bidTeam === i ? (i===0?C0:C1) : "#555", cursor: "pointer" }}>{t[i].name}</button>
+              ))}
+            </div>
+          </Card>
+          <Card>
+            <Lbl>Bid (16–27 normal · 28/Cot = must win all tricks)</Lbl>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, justifyContent: "center", marginBottom: 8 }}>
+              {[16,17,18,19,20,21,22,23,24,25,26,27,28].map(n => {
+                const sel = bid === String(n);
+                return <button key={n} onClick={() => { setBid(sel?"":String(n)); setCustomBid(""); }} style={{ width: 38, height: 36, borderRadius: 9, fontSize: 12, fontWeight: sel?800:500, background: n===28?(sel?"#9b5de5":"#f5f0ff"):sel?C0:"#f2f2f2", color: n===28?(sel?"white":"#9b5de5"):sel?"white":"#333", border: sel?"2px solid "+(n===28?"#9b5de5":C0):"2px solid transparent", cursor: "pointer" }}>{n===28?"Cot":n}</button>;
+              })}
+            </div>
+
+          </Card>
+          <Card>
+            <Lbl>Special Rules <M>(mutually exclusive — pick one, declared before trump)</M></Lbl>
+            <div style={{ display: "flex", gap: 6 }}>
+              {[["double","Bidder's Double","±2 pts",C0],["redouble","Opp. Re-double","±4 pts","#e63946"]].map(([id,label,sub,color])=>(
+                <button key={id} onClick={()=>setSpecial(special===id?"none":id)} style={{flex:1,padding:"9px 4px",borderRadius:11,border:special===id?"2px solid "+color:"2px solid transparent",background:special===id?color+"18":"#f7f7f7",color:special===id?color:"#555",fontWeight:700,fontSize:11,cursor:"pointer",textAlign:"center"}}>
+                  <div>{special===id?"✓ ":""}{label}</div>
+                  <div style={{fontSize:9,opacity:0.7}}>{sub}</div>
+                </button>
+              ))}
+            </div>
+            <div style={{ marginTop: 6, fontSize: 11, color: "#aaa" }}>Single-Handed (±3) and All Hand/Cot (±2) are selected in play phase. These override Double/Re-double.</div>
+          </Card>
+          <Btn primary disabled={!bidNum||bidNum<16||bidNum>28} onClick={()=>setPhase("play")} style={{background:C0,color:"white"}}>Trump Set → Start Play</Btn>
+        </>)}
+
+        {/* PHASE 2: PLAY (8 cards) */}
+        {phase === "play" && (<>
+          <Card style={{ border: "2px solid "+C0, background: "#fff7f0" }}>
+            <div style={{ fontSize: 13, color: C0, fontWeight: 700 }}>
+              {t[bidTeam].name} bid <strong>{bidNum===28?"Cot (28)":bidNum}</strong>
+              {special==="double" && <span style={{color:C0,marginLeft:6}}>· Bidder's Double (±2)</span>}
+              {special==="redouble" && <span style={{color:"#e63946",marginLeft:6}}>· Re-doubled (±4)</span>}
+            </div>
+          </Card>
+
+          {/* Single-Handed: declared after 8 cards, before play — overrides double/redouble */}
+          <Card>
+            <Lbl>Single-Handed? <M>(declared before first card — overrides Double/Re-double)</M></Lbl>
+            <button onClick={()=>setSpecial(special==="single"?"none":"single")} style={{ width:"100%", padding:"11px", borderRadius:12, border:special==="single"?"2px solid #9b5de5":"2px solid transparent", background:special==="single"?"#f5f0ff":"#f7f7f7", color:special==="single"?"#9b5de5":"#555", fontWeight:700, fontSize:13, cursor:"pointer" }}>
+              {special==="single"?"✓ Single-Handed — Bidder plays alone · ±3 pts (must win ALL tricks)":"No — Normal play"}
+            </button>
+          </Card>
+
+          {/* All Hand: mutually exclusive with single — ±2 pts */}
+          {special !== "single" && !isCot && (
+            <Card>
+              <Lbl>All Hand? <M>(bidder won all 8 tricks · ±2 pts, NOT multiplied by Double)</M></Lbl>
+              <button onClick={()=>setSpecial(special==="allhand"?"none":"allhand")} style={{ width:"100%", padding:"11px", borderRadius:12, border:special==="allhand"?"2px solid #9b5de5":"2px solid transparent", background:special==="allhand"?"#f5f0ff":"#f7f7f7", color:special==="allhand"?"#9b5de5":"#555", fontWeight:700, fontSize:13, cursor:"pointer" }}>
+                {special==="allhand"?"✓ All Hand — won all 8 tricks · ±2 pts":"No All Hand"}
+              </button>
+            </Card>
+          )}
+
+          {/* Pair: declared during play after trump revealed */}
+          <Card>
+            <Lbl>Pair Declared? <M>(K+Q of trump, after trump revealed)</M></Lbl>
+            <div style={{ display: "flex", gap: 8, marginBottom: pairTeam!==null&&bidNum>0?6:0 }}>
+              <button onClick={()=>setPairTeam(pairTeam===bidTeam?null:bidTeam)} style={{ flex:1, padding:"10px 4px", borderRadius:11, border:pairTeam===bidTeam?"2px solid #16a34a":"2px solid transparent", background:pairTeam===bidTeam?"#f0fff4":"#f7f7f7", color:pairTeam===bidTeam?"#16a34a":"#555", fontWeight:700, fontSize:12, cursor:"pointer" }}>
+                {pairTeam===bidTeam?"✓ ":""}Bidder Pair
+                <div style={{fontSize:9,color:"#aaa"}}>{bidNum>=19?"target −3":"target +4 (penalty)"}</div>
+              </button>
+              <button onClick={()=>setPairTeam(pairTeam===(1-bidTeam)?null:(1-bidTeam))} style={{ flex:1, padding:"10px 4px", borderRadius:11, border:pairTeam===(1-bidTeam)?"2px solid #e63946":"2px solid transparent", background:pairTeam===(1-bidTeam)?"#fff0f0":"#f7f7f7", color:pairTeam===(1-bidTeam)?"#e63946":"#555", fontWeight:700, fontSize:12, cursor:"pointer" }}>
+                {pairTeam===(1-bidTeam)?"✓ ":""}Defender Pair
+                <div style={{fontSize:9,color:"#aaa"}}>target +4</div>
+              </button>
+              <button onClick={()=>setPairTeam(null)} style={{ padding:"10px 8px", borderRadius:11, border:pairTeam===null?"2px solid #aaa":"2px solid transparent", background:pairTeam===null?"#f2f2f2":"#f7f7f7", color:"#555", fontWeight:700, fontSize:12, cursor:"pointer" }}>None</button>
+            </div>
+            {pairTeam!==null && bidNum>0 && (
+              <div style={{ fontSize:12, color:pairAdj<0?"#16a34a":"#e63946", fontWeight:600, textAlign:"center", background:"#f9f9f9", borderRadius:8, padding:"5px" }}>
+                Target: {bidNum} {pairAdj>0?"+":""}{pairAdj} = <strong>{effectiveBid}</strong> pts needed
+              </div>
+            )}
+          </Card>
+
+          {/* Result entry */}
+          {(special==="single"||special==="allhand"||isCot) ? (
+            <Card>
+              <Lbl>{isCot?"Cot (bid 28)":special==="single"?"Single-Handed":"All Hand"} Result</Lbl>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={()=>setWonAllTricks(true)} style={{ flex:1, padding:"13px", borderRadius:12, border:wonAllTricks===true?"2px solid #16a34a":"2px solid transparent", background:wonAllTricks===true?"#f0fff4":"#f7f7f7", color:wonAllTricks===true?"#16a34a":"#555", fontWeight:700, fontSize:14, cursor:"pointer" }}>
+                  ✅ Won all 8 tricks
+                  <div style={{fontSize:10,color:"#aaa"}}>+{special==="single"?3:2} game pts</div>
+                </button>
+                <button onClick={()=>setWonAllTricks(false)} style={{ flex:1, padding:"13px", borderRadius:12, border:wonAllTricks===false?"2px solid #e63946":"2px solid transparent", background:wonAllTricks===false?"#fff0f0":"#f7f7f7", color:wonAllTricks===false?"#e63946":"#555", fontWeight:700, fontSize:14, cursor:"pointer" }}>
+                  ❌ Didn't win all
+                  <div style={{fontSize:10,color:"#aaa"}}>−{special==="single"?3:2} game pts</div>
+                </button>
+              </div>
+            </Card>
+          ) : (
+            <Card>
+              <Lbl>Bidder's Points Won <M>(out of 28 · need {effectiveBid}+ to win)</M></Lbl>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {[...Array(29)].map((_,n) => {
+                  const sel = bidPts===String(n);
+                  return <button key={n} onClick={()=>setBidPts(String(n))} style={{ width:32, height:30, borderRadius:8, fontSize:11, fontWeight:sel?800:500, background:sel?C0:"#f2f2f2", color:sel?"white":"#333", border:sel?"2px solid "+C0:"2px solid transparent", cursor:"pointer" }}>{n}</button>;
+                })}
+              </div>
+              {bidPts!==""&&<div style={{marginTop:8,fontSize:12,textAlign:"center",fontWeight:600,color:Number(bidPts)>=effectiveBid?"#16a34a":"#e63946"}}>
+                {Number(bidPts)>=effectiveBid?"✅ Bid made":"❌ Bid failed"} ({bidPts}/{effectiveBid} pts needed)
+              </div>}
+            </Card>
+          )}
+
+          {/* Preview */}
+          {preview && (
+            <Card style={{ background:preview.made?"#f0fff4":"#fff0f0", border:"2px solid "+(preview.made?"#16a34a":"#e63946") }}>
+              <div style={{ fontSize:14, fontWeight:800, color:preview.made?"#16a34a":"#e63946", marginBottom:6 }}>
+                {preview.made?"✅ Win":"❌ Lose"} — {preview.delta>0?"+":""}{preview.delta} game pts for {t[bidTeam].name}
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <div style={{ flex:1, background:"white", borderRadius:9, padding:"8px", textAlign:"center" }}>
+                  <div style={{ fontSize:11, color:bidTeam===0?C0:C1, fontWeight:700 }}>{t[bidTeam].name} (bidder)</div>
+                  <div style={{ fontSize:20, fontWeight:900, color:preview.delta>0?"#16a34a":"#e63946" }}>{preview.delta>0?"+":""}{preview.delta}</div>
+                  <div style={{ fontSize:11, color:"#666" }}>→ {scores[bidTeam].score+preview.delta} pts</div>
+                </div>
+                <div style={{ flex:1, background:"#f9f9f9", borderRadius:9, padding:"8px", textAlign:"center" }}>
+                  <div style={{ fontSize:11, color:(1-bidTeam)===0?C0:C1, fontWeight:700 }}>{t[1-bidTeam].name} (defender)</div>
+                  <div style={{ fontSize:20, fontWeight:900, color:"#888" }}>0</div>
+                  <div style={{ fontSize:11, color:"#aaa" }}>no change</div>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={()=>setPhase("bid4")} style={{...SB,flex:1}}>← Back</button>
+            <Btn primary disabled={!canSubmit} onClick={submit} style={{background:C0,color:"white",flex:2}}>Record Round {rn}</Btn>
+          </div>
+        </>)}
+
+        <div style={{ display:"flex", gap:8 }}>
+          <button onClick={onShare} style={{...SB,flex:1}}>📤 Share</button>
+          <button onClick={onDash} style={{...SB,flex:1}}>📊 Stats</button>
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          <button onClick={onUndo} style={{...SB,flex:1,color:"#f4a261"}}>↩ Undo</button>
+          <button onClick={()=>{if(window.confirm("End game?"))onEnd();}} style={{...SB,flex:1}}>🏁 End</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function G28Rules({ onBack }) {
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+        <span style={{ fontSize: 22 }}>🃏</span>
+        <h1 style={{ ...PT, color: "#f4a261" }}>28 — Official Rules</h1>
+      </div>
+      <div style={{ background: "#fff7f0", border: "1px solid #fed7aa", borderRadius: 14, padding: "11px 14px", marginBottom: 16, fontSize: 13, color: "#9a3412", lineHeight: 1.6 }}>
+        4 players, 2 fixed teams (partners opposite). 32 cards. Total 28 card points per deal. Bidding team must meet their contract.
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <Card>
+          <div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 8 }}>🃏 Card Values</div>
+          {[["Jack (J)","3 pts","#f4a261"],["Nine (9)","2 pts","#f4a261"],["Ace (A)","1 pt","#888"],["Ten (10)","1 pt","#888"],["K, Q, 8, 7","0 pts","#bbb"]].map(([c,v,col])=>(
+            <div key={c} style={{display:"flex",justifyContent:"space-between",padding:"6px 10px",background:"#f9f9f9",borderRadius:9,marginBottom:4}}>
+              <span style={{fontSize:13,fontWeight:700,color:col}}>{c}</span>
+              <span style={{fontSize:13,color:"#555"}}>{v}</span>
+            </div>
+          ))}
+          <div style={{marginTop:6,fontSize:12,color:"#9a3412",background:"#fff7f0",borderRadius:8,padding:"6px 10px"}}>4 suits × 7 pts = 28 total points per deal</div>
+        </Card>
+        <Card>
+          <div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 8 }}>🔢 Deal & Bidding</div>
+          <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>
+            1. Dealer deals <strong>4 cards</strong> to each player counter-clockwise<br/>
+            2. Players bid 16–28 on how many points their team will win<br/>
+            3. Highest bidder wins — declares trump secretly from their 4 cards<br/>
+            4. Remaining 4 cards dealt — each player now has <strong>8 cards</strong><br/>
+            5. Play proceeds clockwise; player to dealer's right leads first trick
+          </p>
+        </Card>
+        <Card>
+          <div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 8 }}>⚡ Double & Re-double <M style={{color:"#aaa"}}>(4-card stage, before trump)</M></div>
+          <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>
+            • <strong>Bidder's Double:</strong> After seeing 4 cards, bidder raises stakes. Win or lose <strong>2 game pts</strong><br/>
+            • <strong>Opponent's Re-double:</strong> If bidder doubles, opponent can re-double. Win or lose <strong>4 game pts</strong><br/>
+            • Only one applies; defender score is never affected — only bidder gains/loses
+          </p>
+        </Card>
+        <Card>
+          <div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 8 }}>🧍 Single-Handed <M style={{color:"#aaa"}}>(after 8 cards, before play)</M></div>
+          <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>
+            • Bidder declares single-handed if they have an exceptionally strong hand<br/>
+            • Partner puts cards face-down; bidder plays alone vs both opponents<br/>
+            • Must win <strong>all 8 tricks</strong> to win → <strong>+3 game pts</strong><br/>
+            • Fails (doesn't win all tricks) → <strong>−3 game pts</strong>
+          </p>
+        </Card>
+        <Card>
+          <div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 8 }}>👑 Pair (K + Q of trump) <M style={{color:"#aaa"}}>(declared during play, after trump revealed)</M></div>
+          <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>
+            • A Pair = holding both King AND Queen of the trump suit<br/>
+            • <strong>Bidder's team has pair:</strong> their target drops by 4 pts<br/>
+            • <strong>Defending team has pair:</strong> bidder's target increases by 4 pts<br/>
+            • Must declare before playing to that trick; holder must win at least 1 trick
+          </p>
+        </Card>
+        <Card>
+          <div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 8 }}>🃏 All Hand / Cot</div>
+          <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>
+            • Triggered when bid = 28, or if bidder wins all 8 tricks in any round<br/>
+            • Win all 8 tricks → <strong>+3 game pts</strong> (×double/redouble)<br/>
+            • Fail → <strong>−3 game pts</strong> (×double/redouble)
+          </p>
+        </Card>
+        <Card>
+          <div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 8 }}>🏆 Scoring — Bidder Only</div>
+          <div style={{fontSize:12,color:"#888",marginBottom:8}}>Defender score never changes. Only the bidding team gains or loses points.</div>
+          {[
+            ["Normal bid — made","+1 game pt"],
+            ["Normal bid — failed","−1 game pt"],
+            ["Bidder's Double — made","±2 game pts"],
+            ["Opponent Re-double — made/failed","±4 game pts"],
+            ["Single-Handed — won ALL tricks","±3 pts (overrides Double/Re-double)"],
+            ["All Hand / Cot — won all tricks","±2 pts (NOT multiplied)"],
+            ["Pair (bidder, bid ≥19)","target −3 pts"],
+            ["Pair (bidder, bid <19)","target +4 pts (penalty)"],
+            ["Pair (defender declared)","bidder target +4 pts"],
+          ].map(([l,v])=>(
+            <div key={l} style={{display:"flex",justifyContent:"space-between",gap:8,padding:"6px 10px",background:"#f9f9f9",borderRadius:9,marginBottom:4}}>
+              <span style={{fontSize:12,color:"#555",flex:1}}>{l}</span>
+              <span style={{fontSize:12,fontWeight:700,color:"#f4a261",flexShrink:0}}>{v}</span>
+            </div>
+          ))}
+        </Card>
+        <Card>
+          <div style={{ fontWeight: 800, fontSize: 14, color: "#f4a261", marginBottom: 8 }}>🎴 The Set System</div>
+          <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>
+            • Scores are tracked 0 to ±6. At <strong>+6</strong>: a Red set card (5→4→3…) is placed; score resets to 0<br/>
+            • At <strong>−6</strong>: a Black set card is placed; score resets to 0<br/>
+            • Sets are <strong>fully reversible</strong> — gaining/losing game pts adjusts the set cards accordingly<br/>
+            • The score displayed in-app is the current running total (resets at ±6)
+          </p>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+
+function G28Dashboard({ game, onBack, showToast }) {
+  const t = game.teams;
+  const C0 = "#f4a261", C1 = "#4a7cfc";
+  const state = calc28Scores(game.rounds);
+  const rounds = game.rounds;
+
+  // Per-team stats
+  const teamStats = [0,1].map(i => {
+    const wins = rounds.filter(r => (r.gamePoints?.[i]||0) > 0).length;
+    const losses = rounds.filter(r => (r.gamePoints?.[i]||0) < 0).length;
+    const bids = rounds.filter(r => r.bidTeam === i).length;
+    const bidsMade = rounds.filter(r => r.bidTeam === i && r.bidderMade).length;
+    return { wins, losses, bids, bidsMade };
+  });
+
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "white", background: C0, borderRadius: 8, padding: "3px 10px" }}>28</span>
+        <h1 style={PT}>Stats</h1>
+      </div>
+      <p style={{ margin: "0 0 16px", color: "#999", fontSize: 13 }}>{rounds.length} rounds played</p>
+
+      {/* Score cards */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+        {[0,1].map(i => {
+          const st = state[i];
+          const absSets = Math.abs(st.sets);
+          const isNeg = st.sets < 0;
+          return (
+            <div key={i} style={{ flex:1, background:"white", borderRadius:14, padding:"14px 10px", textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.06)" }}>
+              <div style={{ fontSize:11, color:i===0?C0:C1, fontWeight:700, textTransform:"uppercase", marginBottom:4 }}>{t[i].name}</div>
+              <div style={{ fontSize:32, fontWeight:900, color:st.score<0?"#e63946":"#111" }}>{st.score}</div>
+              <div style={{ fontSize:10, color:"#888" }}>current pts</div>
+              {absSets > 0 && (
+                <div style={{ display:"flex", gap:3, justifyContent:"center", marginTop:6, flexWrap:"wrap" }}>
+                  {[...Array(absSets)].map((_,si) => (
+                    <div key={si} style={{ width:18, height:26, borderRadius:3, background:isNeg?"#1a1a2e":"#e63946", color:"white", fontSize:10, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      {Math.max(5-si,1)}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ fontSize:10, color:"#aaa", marginTop:4 }}>{st.sets} set{Math.abs(st.sets)!==1?"s":""}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Per-team stats */}
+      {[0,1].map(i => (
+        <Card key={i} style={{ marginBottom:10 }}>
+          <div style={{ fontWeight:700, fontSize:13, color:i===0?C0:C1, marginBottom:10 }}>{t[i].name}</div>
+          <div style={{ display:"flex", gap:8 }}>
+            {[
+              ["Rounds Won", teamStats[i].wins, "#16a34a"],
+              ["Rounds Lost", teamStats[i].losses, "#e63946"],
+              ["Bids Won", teamStats[i].bidsMade+"/"+teamStats[i].bids, "#f4a261"],
+            ].map(([label,val,color]) => (
+              <div key={label} style={{ flex:1, background:"#f7f7f7", borderRadius:10, padding:"10px 6px", textAlign:"center" }}>
+                <div style={{ fontSize:18, fontWeight:900, color }}>{val}</div>
+                <div style={{ fontSize:10, color:"#aaa", marginTop:2 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ))}
+
+      {/* Round log */}
+      <Card>
+        <Lbl>Round Log</Lbl>
+        <div style={{ maxHeight:200, overflowY:"auto", display:"flex", flexDirection:"column", gap:4 }}>
+          {[...rounds].reverse().map((r,i) => {
+            const ri = rounds.length - i;
+            const gp = r.gamePoints || [0,0];
+            const bidder = t[r.bidTeam]?.name || "";
+            return (
+              <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"5px 8px", background:"#f9f9f9", borderRadius:8 }}>
+                <span style={{ fontSize:11, color:"#888" }}>Rd {ri}</span>
+                <span style={{ fontSize:11, color:"#555" }}>{bidder} bid {r.bid}{r.special==="single"?" 1H":r.special==="allhand"?" AllH":r.special==="double"?" 2×":r.special==="redouble"?" 4×":""}</span>
+                <span style={{ fontSize:11, fontWeight:700, color:gp[r.bidTeam]>0?"#16a34a":"#e63946" }}>{gp[r.bidTeam]>0?"+":""}{gp[r.bidTeam]}</span>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+
+function G28History({ game, onBack }) {
+  const t = game.teams;
+  const C0 = "#f4a261", C1 = "#4a7cfc";
+  // Build cumulative set-aware state per round
+  let cumState = [{score:0,sets:0},{score:0,sets:0}];
+  const rows = game.rounds.map(r => {
+    const gp = r.gamePoints || [0, 0];
+    cumState = cumState.map((st, i) => {
+      const d = gp[i] || 0;
+      let {score, sets} = st;
+      score += d;
+      if (score >= 6) { sets += 1; score = 0; }
+      else if (score <= -6) { sets -= 1; score = 0; }
+      return {score, sets};
+    });
+    return { r, cum: cumState.map(s => ({...s})) };
+  });
+  const finalState = cumState;
+  return (
+    <div style={{ padding: "48px 20px 40px" }}>
+      <button onClick={onBack} style={BK}>← Back</button>
+      <h1 style={PT}>Round History</h1>
+      <p style={{ margin: "2px 0 14px", color: "#999", fontSize: 13 }}>{game.rounds.length} rounds · {t[0].name}: {finalState[0].sets}S {finalState[0].score}pts · {t[1].name}: {finalState[1].sets}S {finalState[1].score}pts</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+        {[...rows].reverse().map(({ r, cum }, i) => {
+          const ri = game.rounds.length - i;
+          const gp = r.gamePoints || [0, 0];
+          return (
+            <div key={i} style={{ background: "#f7f7f7", borderRadius: 14, padding: "13px 14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: "#999", fontWeight: 600 }}>Rd {ri}</span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {r.singleHanded && <span style={{ fontSize: 10, background: "#f5f0ff", color: "#9b5de5", borderRadius: 5, padding: "1px 5px", fontWeight: 700 }}>1H</span>}
+                {r.allHand && <span style={{ fontSize: 10, background: "#f5f0ff", color: "#9b5de5", borderRadius: 5, padding: "1px 5px", fontWeight: 700 }}>AllH</span>}
+                {r.isSet && <span style={{ fontSize: 10, background: "#fff0f0", color: "#e63946", borderRadius: 5, padding: "1px 5px", fontWeight: 700 }}>SET</span>}
+                  {r.double && <span style={{ fontSize: 10, background: "#fef3c7", color: "#856404", borderRadius: 5, padding: "1px 5px", fontWeight: 700 }}>2×</span>}
+                  {r.redouble && <span style={{ fontSize: 10, background: "#fee2e2", color: "#e63946", borderRadius: 5, padding: "1px 5px", fontWeight: 700 }}>4×</span>}
+                </div>
+                {r.ts && <span style={{ fontSize: 10, color: "#ccc" }}>{fmt(r.ts)}</span>}
+              </div>
+              <div style={{ fontSize: 13, color: "#333", marginBottom: 8 }}>
+                <strong>{t[r.bidTeam]?.name}</strong> bid <strong>{r.bid}</strong> · got <strong>{r.pointsWon?.[r.bidTeam]}</strong> pts
+                <span style={{ marginLeft: 8, color: r.bidderMade ? "#16a34a" : "#e63946", fontWeight: 700 }}>{r.bidderMade ? "✅ Made" : "❌ Failed"}</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                {[0, 1].map(j => (
+                  <div key={j} style={{ flex: 1, background: "white", borderRadius: 9, padding: "7px", textAlign: "center" }}>
+                    <div style={{ fontSize: 11, color: j === 0 ? C0 : C1, fontWeight: 700 }}>{t[j].name}</div>
+                    <div style={{ fontSize: 13, color: "#555" }}>{r.tricksWon?.[j] || 0} tricks · {r.pointsWon?.[j] || 0} pts</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: gp[j] > 0 ? "#16a34a" : gp[j] < 0 ? "#e63946" : "#888" }}>{gp[j] > 0 ? "+" : ""}{gp[j]} game pts</div>
+                    <div style={{ fontSize: 10, color: "#aaa" }}>∑ {cum[j].sets}S · {cum[j].score}pts</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        {game.rounds.length === 0 && <div style={{ color: "#bbb", textAlign: "center", padding: 40 }}>No rounds yet</div>}
+      </div>
+    </div>
+  );
 }
 
 
@@ -2110,7 +2552,7 @@ function TPSetup({ onBack, onStart }) {
   );
 }
 
-function TPGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,onDash,onEditPlayers,lang,setLang}) {
+function TPGame({game,hand,setHand,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,onDash,onEditPlayers,lang,setLang,onUndo}) {
   const p = game.players;
   const boot = Number(game.boot) || 2;
   const chipStart = Number(game.chipStart) || 500;
@@ -2118,7 +2560,7 @@ function TPGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,
   const savedChips=p.map((_,i)=>chipStart+game.rounds.reduce((a,r)=>a+(r.changes?.[i]||0),0));
 
   const initDealer = Number(game.dealerIdx)||0;
-  const [hand, setHand] = useState(null);
+  // hand/setHand lifted to App to preserve across navigation
   const [customAmt, setCustomAmt] = useState("");
   const [showWinner, setShowWinner] = useState(false);
 
@@ -2156,6 +2598,8 @@ function TPGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,
     } else if (action==="Chaal"||action==="Raise") {
       nh.pot += amount; nh.changes[ni] -= amount; nh.stake = Math.floor(amount/2);
     } else if (action==="Show") {
+      // Show costs same as Chaal (seen player minimum)
+      if (amount > 0) { nh.pot += amount; nh.changes[ni] -= amount; }
       nh.status = "showdown";
     } else if (action==="Sideshow") {
       // Find the previous seen player (not current player ni)
@@ -2195,6 +2639,18 @@ function TPGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,
     setHand(makeTPHand(p, boot, nextDi));
     setShowWinner(false);
     showToast("🏆 "+p[wi]+" wins "+h.pot+" chips!");
+    const losers2=p.filter((_,i)=>i!==wi);
+    const spk2=lang==="hi"
+      ?p[wi]+" ne is haath mein jeete hain "+h.pot+" chips! "+losers2.map(l=>{const li=p.indexOf(l);const lost=Math.abs(fc[li]||0);return l+" ne haare hain "+lost+" chips";}).join(". ")+"."
+      :p[wi]+" wins the pot of "+h.pot+" chips! "+losers2.map(l=>{const li=p.indexOf(l);const lost=Math.abs(fc[li]||0);return l+" lost "+lost+" chips";}).join(". ")+".";
+    speak(spk2,lang,null);
+    // Voice: winner and losers
+    const losers=p.filter((_,i)=>i!==wi&&h.pStatus[i]!=="out");
+    const wonAmt=h.pot-(h.changes[wi]<0?Math.abs(h.changes[wi]):0);
+    const spk=lang==="hi"
+      ?p[wi]+" ne is haath mein jeete hain "+h.pot+" chips! "+losers.map((l,i)=>{const li=p.indexOf(l);const lost=Math.abs(h.changes[li]||0);return l+" ne haare hain "+lost+" chips";}).join(". ")+"."
+      :p[wi]+" wins "+h.pot+" chips this hand! "+losers.map((l,i)=>{const li=p.indexOf(l);const lost=Math.abs(h.changes[li]||0);return l+" lost "+lost+" chips";}).join(". ")+".";
+    speak(spk,lang,null);
   };
 
   const spkText = chipScoreSpeech(game,"Teen Patti",lang||"en");
@@ -2220,16 +2676,19 @@ function TPGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,
       {/* Chip counts */}
       <div style={{margin:"12px 20px 0",overflowX:"auto"}}>
         <div style={{display:"flex",gap:7,minWidth:"max-content"}}>
-          {p.map((pl,i)=>(
+          {p.map((pl,i)=>{
+            return(
             <div key={i} style={{minWidth:78,background:h.pStatus[i]==="folded"?"#f0f0f0":"white",borderRadius:13,padding:"9px 7px",textAlign:"center",boxShadow:"0 2px 6px rgba(0,0,0,0.07)",opacity:h.pStatus[i]==="folded"?0.5:1,border:ni===i&&h.status==="active"?"2px solid "+PC[i%PC.length]:"2px solid transparent"}}>
               <div style={{fontSize:9,color:PC[i%PC.length],fontWeight:700,textTransform:"uppercase"}}>{pl}</div>
               <div style={{fontSize:20,fontWeight:900,color:"#111"}}>{chips[i]}</div>
               <div style={{fontSize:9,color:"#aaa",marginTop:1}}>{h.pStatus[i]==="folded"?"FOLD":h.pStatus[i]==="seen"?"SEEN":"BLIND"}</div>
             </div>
-          ))}
+          )})}
         </div>
       </div>
 
+      {/* Dealer — rotates automatically each hand */}
+      <div style={{margin:"9px 20px 0",padding:"0 0 0 0"}}><ShufflerCard players={p} value={p[Number(h.dealerIdx)||0]} onChange={(v)=>{const idx=p.indexOf(v);if(idx>=0){const nh={...h,dealerIdx:idx};setHand(nh);}}} lang={lang}/></div>
       {/* Pot */}
       <div style={{margin:"9px 20px 0",background:"#fff8e1",borderRadius:13,padding:"9px 15px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <span style={{fontSize:13,color:"#856404",fontWeight:600}}>🪙 Pot</span>
@@ -2273,7 +2732,7 @@ function TPGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,
                 <ActionBtn label="Chaal" sub={"Pay "+minBet} color={TP_C.Chaal} onClick={()=>doAction("Chaal",minBet)}/>
                 <ActionBtn label="Raise" sub={"Pay "+(minBet*2)} color={TP_C.Raise} onClick={()=>doAction("Raise",minBet*2)}/>
                 <ActionBtn label="Fold" sub="Drop" color={TP_C.Fold} onClick={()=>doAction("Fold",0)}/>
-                {active===2&&<ActionBtn label="Show" sub="Showdown" color={TP_C.Show} onClick={()=>doAction("Show",0)}/>}
+                {active===2&&<ActionBtn label="Show" sub={"Pay "+minBet} color={TP_C.Show} onClick={()=>doAction("Show",minBet)}/>}
                 {active>2&&<ActionBtn label="Sideshow" sub="Compare" color={TP_C.Sideshow} onClick={()=>doAction("Sideshow",0)}/>}
               </>}
             </div>
@@ -2295,22 +2754,26 @@ function TPGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,
               The lower hand folds. Game continues with remaining players.
             </p>
             <div style={{display:"flex",gap:8}}>
-              {(h.sideshowPlayers||[]).map(i=>(
+              {(h.sideshowPlayers||[]).map(i=>{
+                const survivors=(h.sideshowPlayers||[]).filter(j=>j!==i);
+                return(
                 <button key={i} onClick={()=>{
                   const nh=JSON.parse(JSON.stringify(h));
                   nh.pStatus[i]="folded";
-                  nh.status="active"; // game continues — NOT showdown
+                  nh.status="active";
                   nh.winner=null;
                   const rem=nh.pStatus.filter(s=>s!=="folded"&&s!=="out").length;
-                  if(rem===1){
-                    const wi=nh.pStatus.findIndex(s=>s!=="folded"&&s!=="out");
-                    nh.changes[wi]+=nh.pot;
-                    nh.status="finished";
-                    nh.winner=wi;
-                  }
+                  if(rem===1){const wi=nh.pStatus.findIndex(s=>s!=="folded"&&s!=="out");nh.changes[wi]+=nh.pot;nh.status="finished";nh.winner=wi;}
                   setHand(nh);
+                  // Sideshow speech
+                  const survivor=p[survivors[0]]||"";
+                  const spk=lang==="hi"
+                    ?p[i]+" ke patte hai ghatiya! "+survivor+" rahenge game mein."
+                    :p[i]+" has the lower hand and folds. "+survivor+" stays in the game.";
+                  speak(spk,lang,null);
                 }} style={{flex:1,padding:"12px 8px",borderRadius:13,background:PC[i%PC.length],color:"white",border:"none",fontWeight:700,fontSize:14,cursor:"pointer"}}>{p[i]} has lower hand → folds</button>
-              ))}
+                );
+              })}
             </div>
             <button onClick={()=>{
               const nh=JSON.parse(JSON.stringify(h));
@@ -2350,11 +2813,30 @@ function TPGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,
             if(h.actions.length>0){
               const nh=JSON.parse(JSON.stringify(h));
               const last=nh.actions.pop();
-              // Reverse the action effects
-              if(last.action==="Fold")nh.pStatus[p.indexOf(last.player)]="blind";
-              else if(last.action==="Seen")nh.pStatus[p.indexOf(last.player)]="blind";
-              if(last.amount>0){nh.pot-=last.amount;nh.changes[p.indexOf(last.player)]+=last.amount;}
-              nh.status="active";nh.winner=null;
+              const pi=p.indexOf(last.player);
+              // Restore to correct prior status by scanning remaining actions
+              if(last.action==="Fold"||last.action==="Seen"){
+                // Find what this player's status was before this action
+                let prevStatus="blind";
+                for(let i=nh.actions.length-1;i>=0;i--){
+                  if(nh.actions[i].player===last.player){
+                    const a=nh.actions[i].action;
+                    if(a==="Seen"||a==="Chaal"||a==="Raise"||a==="Show")prevStatus="seen";
+                    else if(a==="Blind")prevStatus="blind";
+                    break;
+                  }
+                }
+                nh.pStatus[pi]=prevStatus;
+              }
+              if(last.amount>0){nh.pot-=last.amount;nh.changes[pi]+=last.amount;}
+              // Restore stake from second-to-last action if needed
+              if(nh.actions.length>0){
+                const prev=nh.actions[nh.actions.length-1];
+                if(prev.amount>0)nh.stake=Math.floor(prev.amount/(nh.pStatus[p.indexOf(prev.player)]==="seen"?2:1));
+              } else {
+                nh.stake=boot;
+              }
+              nh.status="active";nh.winner=null;nh.sideshowPlayers=null;
               setHand(nh);setShowWinner(false);showToast("Action undone ↩");
             } else if(game.rounds.length>0&&window.confirm("Undo last saved hand?")){
               onUndo();
@@ -2543,7 +3025,7 @@ function PokerSetup({onBack,onStart}){
   );
 }
 
-function PokerGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,onDash,onEditPlayers,lang,setLang,onUndo}){
+function PokerGame({game,hand,setHand,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onShare,onDash,onEditPlayers,lang,setLang,onUndo}){
   const p=game.players;
   const sb=Number(game.sb)||5;
   const bb=Number(game.bb)||10;
@@ -2552,7 +3034,7 @@ function PokerGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onSha
   const savedChips=p.map((_,i)=>chipStart+game.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||0),0));
 
   const initDi=Number(game.dealerIdx)||0;
-  const [hand,setHand]=useState(null);
+  // hand/setHand lifted to App to preserve across navigation
   const [custom,setCustom]=useState("");
 
   const h=hand||makePokerHand(p,sb,bb,initDi);
@@ -2624,6 +3106,18 @@ function PokerGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onSha
     onSubmit({changes:fc,pot:h.pot,winner:wi,winnerName:p[wi],actions:h.actions,dealerIdx:Number(h.dealerIdx),ts:new Date().toISOString()});
     setHand(makePokerHand(p,sb,bb,nextDi));
     showToast("🏆 "+p[wi]+" wins "+h.pot+" chips!");
+    const losers2=p.filter((_,i)=>i!==wi);
+    const spk2=lang==="hi"
+      ?p[wi]+" ne is haath mein jeete hain "+h.pot+" chips! "+losers2.map(l=>{const li=p.indexOf(l);const lost=Math.abs(fc[li]||0);return l+" ne haare hain "+lost+" chips";}).join(". ")+"."
+      :p[wi]+" wins the pot of "+h.pot+" chips! "+losers2.map(l=>{const li=p.indexOf(l);const lost=Math.abs(fc[li]||0);return l+" lost "+lost+" chips";}).join(". ")+".";
+    speak(spk2,lang,null);
+    // Voice: winner and losers
+    const losers=p.filter((_,i)=>i!==wi&&h.pStatus[i]!=="out");
+    const wonAmt=h.pot-(h.changes[wi]<0?Math.abs(h.changes[wi]):0);
+    const spk=lang==="hi"
+      ?p[wi]+" ne is haath mein jeete hain "+h.pot+" chips! "+losers.map((l,i)=>{const li=p.indexOf(l);const lost=Math.abs(h.changes[li]||0);return l+" ne haare hain "+lost+" chips";}).join(". ")+"."
+      :p[wi]+" wins "+h.pot+" chips this hand! "+losers.map((l,i)=>{const li=p.indexOf(l);const lost=Math.abs(h.changes[li]||0);return l+" lost "+lost+" chips";}).join(". ")+".";
+    speak(spk,lang,null);
   };
 
   const advStreet=()=>{
@@ -2671,6 +3165,8 @@ function PokerGame({game,onSubmit,onHistory,onRules,onEnd,onHome,showToast,onSha
         </div>
       </div>
 
+      {/* Dealer — rotates automatically each hand */}
+      <div style={{margin:"9px 20px 0",padding:"0 0 0 0"}}><ShufflerCard players={p} value={p[Number(h.dealerIdx)||0]} onChange={(v)=>{const idx=p.indexOf(v);if(idx>=0){const nh={...h,dealerIdx:idx};setHand(nh);}}} lang={lang}/></div>
       {/* Street + Pot */}
       <div style={{margin:"9px 20px 0",display:"flex",gap:8}}>
         <div style={{display:"flex",gap:4,flex:1}}>
@@ -2925,6 +3421,7 @@ function RummyGame({ game, onSubmit, onHistory, onRules, onEnd, onHome, showToas
   const scores = p.map((_, i) => game.rounds.reduce((a, r) => a + (r.scores?.[i] || 0), 0));
   const rn = game.rounds.length + 1;
   const [winner, setWinner] = useState(0);
+  const [dealer, setDealer] = useState(null);
   const [playerData, setPlayerData] = useState(p.map(() => ({ action: "play", cardPts: "" })));
   // actions: play | firstDrop | middleDrop | wrongDeclare
 
@@ -2955,6 +3452,12 @@ function RummyGame({ game, onSubmit, onHistory, onRules, onEnd, onHome, showToas
   const submit = () => {
     const roundScores = p.map((_, i) => getScore(i));
     onSubmit({ winner, winnerName: p[winner], scores: roundScores, drops: playerData.map(d => d.action), cardPts: playerData.map(d => Number(d.cardPts) || 0), ts: new Date().toISOString() });
+    // Voice result
+    const losers=p.filter((_,i)=>i!==winner);
+    const spk=lang==="hi"
+      ?p[winner]+" ne Rummy declare kiya! "+losers.map(l=>{const li=p.indexOf(l);return l+": "+roundScores[li]+" points";}).join(". ")+"."
+      :p[winner]+" declares Rummy! "+losers.map(l=>{const li=p.indexOf(l);return l+" gets "+roundScores[li]+" points";}).join(". ")+".";
+    speak(spk,lang||"en",null);
     setPlayerData(p.map(() => ({ action: "play", cardPts: "" })));
     setWinner(0);
   };
@@ -3065,6 +3568,7 @@ function RummyGame({ game, onSubmit, onHistory, onRules, onEnd, onHome, showToas
           </Card>
         )}
 
+        <ShufflerCard players={p} value={dealer} onChange={setDealer} lang={lang}/>
         <Btn primary disabled={!canSubmit} onClick={submit} style={{ background: "#f15bb5" }}>Record Round {rn}</Btn>
         <div style={{ display: "flex", gap: 8 }}>
           <SpeakBtn text={spkText} lang={lang || "en"} size={46} />
