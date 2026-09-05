@@ -1484,6 +1484,16 @@ const UNO_CARD_POINTS = {
   "Wild/Wild Draw 4": 50
 };
 
+const newRummyGame = () => ({
+  id: Date.now(), type: "rummy", name: "",
+  players: ["", "", ""],
+  targetScore: 100,
+  rounds: [],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  finished: false
+});
+
 const newUNOGame = () => ({
   id: Date.now(), type: "uno", name: "",
   players: ["", "", ""],
