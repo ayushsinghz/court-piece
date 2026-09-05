@@ -425,7 +425,11 @@ function GenericDashboard({game,onBack,showToast,label,color,getScores,getPlayer
     ctx.fillText(label+(game.name?" — "+game.name:"")+" Stats",cx,y+18);
     ctx.fillStyle="#888";ctx.font="11px -apple-system,sans-serif";ctx.fillText(game.rounds.length+" rounds · "+days.length+" sessions",cx,y+36);y+=54;
     const bw=(W-PAD*2-(p.length-1)*8)/p.length;
-    p.forEach((pl,i)=>{const bx=PAD+i*(bw+8);ctx.fillStyle="white";rr(bx,y,bw,68,11);ctx.fill();ctx.fillStyle=COLORS[i%COLORS.length];ctx.font="bold 9px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText(String(pl).toUpperCase(),bx+bw/2,y+14);ctx.fillStyle="#111";ctx.font="bold 26px -apple-system,sans-serif";ctx.fillText(String(scores[i]),bx+bw/2,y+46);});y+=80;
+    // Get team members if available
+    const getLabel=(i)=>{if(game.teams?.[i]){const tm=game.teams[i];return{name:tm.name,sub:tm.players?.filter(Boolean).join(" & ")||""};}return{name:String(p[i]||""),sub:""};};
+    const hasTeams=!!game.teams;
+    const cardH=hasTeams?82:68;
+    p.forEach((pl,i)=>{const bx=PAD+i*(bw+8);const lbl=getLabel(i);ctx.fillStyle="white";rr(bx,y,bw,cardH,11);ctx.fill();ctx.fillStyle=COLORS[i%COLORS.length];ctx.font="bold 9px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText(String(lbl.name).toUpperCase(),bx+bw/2,y+14);ctx.fillStyle="#111";ctx.font="bold 26px -apple-system,sans-serif";ctx.fillText(String(scores[i]),bx+bw/2,y+44);if(lbl.sub){ctx.fillStyle="#888";ctx.font="8px -apple-system,sans-serif";ctx.fillText(lbl.sub,bx+bw/2,y+58);}});y+=cardH+12;
     y+=8;ctx.fillStyle="#aaa";ctx.font="9px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText("Scored with Card Games app",cx,y+14);
     canvas.toBlob(blob=>{setSharing(false);if(!blob)return;const url=URL.createObjectURL(blob);if(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([blob],"stats.jpg",{type:"image/jpeg"})]})){navigator.share({files:[new File([blob],"stats.jpg",{type:"image/jpeg"})],title:label+" Stats"}).catch(()=>{});}else{const a=document.createElement("a");a.href=url;a.download="stats.jpg";a.click();showToast("Downloaded!");}setTimeout(()=>URL.revokeObjectURL(url),5000);},"image/jpeg",0.82);
   };
@@ -438,10 +442,11 @@ function GenericDashboard({game,onBack,showToast,label,color,getScores,getPlayer
         <div style={{background:"white",borderRadius:18,padding:16,boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
           <SecTitle>🏆 Current Scores</SecTitle>
           <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
-            {p.map((pl,i)=><div key={i} style={{flex:1,minWidth:70,background:"#f9f9f9",borderRadius:13,padding:"11px 8px",textAlign:"center"}}>
-              <div style={{fontSize:10,color:COLORS[i%COLORS.length],fontWeight:700,textTransform:"uppercase",marginBottom:2}}>{pl}</div>
+            {p.map((pl,i)=>{const tm=game.teams?.[i];const sub=tm?.players?.filter(Boolean).join(" & ")||null;return(<div key={i} style={{flex:1,minWidth:70,background:"#f9f9f9",borderRadius:13,padding:"11px 8px",textAlign:"center"}}>
+              <div style={{fontSize:10,color:COLORS[i%COLORS.length],fontWeight:700,textTransform:"uppercase",marginBottom:1}}>{pl}</div>
+              {sub&&<div style={{fontSize:9,color:"#aaa",marginBottom:2}}>{sub}</div>}
               <div style={{fontSize:26,fontWeight:900,color:"#111",lineHeight:1}}>{scores[i]}</div>
-            </div>)}
+            </div>);})}
           </div>
         </div>
         <div style={{background:"white",borderRadius:18,padding:16,boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
@@ -590,8 +595,13 @@ function GenericEditPlayers({players,onBack,onSave,color,label}){
 
 function GenericShare({game,scores,onBack,showToast,label,color}){
   const p=game.players||game.teams?.map(t=>t.name)||[];
-  const scoreLines=Array.isArray(scores)?scores.map((s,i)=>p[i]+": "+s).join("  |  "):"";
-  const text=["🃏 "+label+(game.name?" — "+game.name:""),"━━━━━━━━━━━━━━━━━━━━━━","SCORE  "+scoreLines,"","Updated: "+fmt(game.updatedAt),"Scored with Card Games app"].join("\n");
+  // Build player label including team members for team games
+  const playerLabel=(i)=>{
+    if(game.teams?.[i]){const tm=game.teams[i];return tm.name+(tm.players?.length?" ("+tm.players.filter(Boolean).join(" & ")+")":"");}
+    return p[i]||"";
+  };
+  const scoreLines=Array.isArray(scores)?scores.map((s,i)=>playerLabel(i)+": "+s).join("\n"):"";
+  const text=["🃏 "+label+(game.name?" — "+game.name:""),"━━━━━━━━━━━━━━━━━━━━━━","SCORE",""+scoreLines,"","Updated: "+fmt(game.updatedAt),"Scored with Card Games app"].join("\n");
   const wa="https://wa.me/?text="+encodeURIComponent(text);
   const copy=()=>{const fb=()=>{const el=document.createElement("textarea");el.value=text;el.style.cssText="position:fixed;opacity:0";document.body.appendChild(el);el.focus();el.select();try{document.execCommand("copy")}catch{}document.body.removeChild(el);showToast("Copied!")};navigator.clipboard?.writeText(text).then(()=>showToast("Copied!")).catch(fb)||fb()};
   return(
