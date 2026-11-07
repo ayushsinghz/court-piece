@@ -81,12 +81,18 @@ const ttfRoundResult=r=>{
 
 // ── Speech ────────────────────────────────────────────────────────────────────
 function speak(text,lang,onEnd){
-  if(!window.speechSynthesis)return;
-  window.speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text);
-  u.lang=lang==="hi"?"hi-IN":"en-US";u.rate=0.9;
-  u.onend=onEnd||function(){};u.onerror=onEnd||function(){};
-  window.speechSynthesis.speak(u);
+  const ss=window.speechSynthesis;
+  if(!ss)return;
+  try{
+    // Cancel only when something is actually queued: an unconditional cancel() right before
+    // speak() makes some mobile browsers silently drop the new utterance.
+    if(ss.speaking||ss.pending)ss.cancel();
+    if(ss.paused)ss.resume();
+    const u=new SpeechSynthesisUtterance(text);
+    u.lang=lang==="hi"?"hi-IN":"en-US";u.rate=0.9;
+    u.onend=onEnd||function(){};u.onerror=onEnd||function(){};
+    ss.speak(u);
+  }catch(e){if(onEnd)onEnd();}
 }
 function cpScoreSpeech(game,scores,lang){
   const t=game.teams,diff=Math.abs(scores[0]-scores[1]),lead=scores[0]>scores[1]?0:scores[1]>scores[0]?1:-1;
@@ -568,12 +574,45 @@ function permuteHand(h, perm){
   if(Array.isArray(h.sideshowPlayers))nh.sideshowPlayers=h.sideshowPlayers.map(i=>inv[i]!=null?inv[i]:i);
   return nh;
 }
-// fc[i] = chips won(+)/lost(-) this hand = balance now minus balance at end of previous hand
-function roundChipSpeech(p, fc, wi, lang){
-  const won=Math.max(0,fc[wi]||0);
-  const losers=p.map((n,i)=>({n,i,lost:Math.max(0,-(fc[i]||0))})).filter(x=>x.i!==wi&&x.lost>0);
-  if(lang==="hi")return p[wi]+" ne iss round mein jeete hain "+won+" chips"+(losers.length?" aur "+losers.map(x=>x.n+" ne haare hain "+x.lost+" chips").join(", "):"")+".";
-  return p[wi]+" won "+won+" chips this round"+(losers.length?" and "+losers.map(x=>x.n+" lost "+x.lost+" chips").join(", "):"")+".";
+function unoScoreSpeech(game,lang){
+  const p=game.players;
+  const sc=p.map((_,i)=>game.rounds.reduce((a,r)=>a+(r.scores?.[i]||0),0));
+  if(!game.rounds.length)return lang==="hi"?"UNO shuru hua. Abhi koi score nahi hai.":"UNO game started. No scores yet.";
+  const lo=sc.indexOf(Math.min(...sc));
+  if(lang==="hi")return"UNO ka score. "+p.map((pl,i)=>pl+": "+sc[i]+" point").join(". ")+". "+p[lo]+" sabse aage hai.";
+  return"UNO scores. "+p.map((pl,i)=>pl+": "+sc[i]).join(", ")+". "+p[lo]+" is leading with the lowest score.";
+}
+// ── Round-end call-out (every game except Court Piece) ──────────────────────────
+// winners / losers: [{name, amt}] — amt null means "this round" (no number to announce)
+function roundCallout(lang, winners, losers, scoreText, unit){
+  const hi = lang==="hi";
+  const amt = x => x.amt==null ? (hi?"yeh round":"this round") : x.amt+" "+unit;
+  const w = winners.map(x => hi ? x.name+" ki hogyi bale bale aur jittee hai "+amt(x)+"." : x.name+" is celebrating and wins "+amt(x)+".");
+  const l = losers.map(x => hi ? x.name+" ne haare hai "+amt(x)+"." : x.name+" lost "+amt(x)+".");
+  if(!w.length&&!l.length)w.push(hi?"Is round mein kisi ka score nahi badla.":"No change in score this round.");
+  const tail = hi ? "Abhi ka score is praakaar hai. "+scoreText+"." : "The score right now is as follows. "+scoreText+".";
+  return [...w,...l,tail].join(" ");
+}
+function chipScoreList(game){
+  return game.players.map((pl,i)=>pl+": "+(Number(game.chipStart)+game.rounds.reduce((a,r)=>a+(r.changes?.[i]||r.chipChanges?.[i]||r.deltas?.[i]||0),0))+" chips").join(", ");
+}
+function pointScoreList(game){
+  return game.players.map((pl,i)=>pl+": "+game.rounds.reduce((a,r)=>a+(r.scores?.[i]||0),0)+" points").join(", ");
+}
+function ttfScoreList(game){
+  const s=calcTTFScores(game.rounds);
+  return game.players.map((pl,i)=>pl+": "+(s[i]>0?"+":"")+s[i]).join(", ");
+}
+function g28ScoreList(game, lang){
+  const st=calc28Scores(game.rounds);
+  return game.teams.map((t,i)=>t.name+": "+st[i].score+" points, "+(st[i].sets<0?"minus ":"")+Math.abs(st[i].sets)+(lang==="hi"?" set":(Math.abs(st[i].sets)===1?" set":" sets"))).join(", ");
+}
+// Teen Patti / Poker: fc[i] = chips won(+)/lost(-) vs the balance at the end of the previous hand
+function chipRoundCallout(game, rec, lang){
+  const p=game.players, fc=rec.changes, wi=rec.winner;
+  const after={...game,rounds:[...game.rounds,rec]};
+  const losers=p.map((n,i)=>({name:n,amt:Math.max(0,-(fc[i]||0)),i})).filter(x=>x.i!==wi&&x.amt>0);
+  return roundCallout(lang,[{name:p[wi],amt:Math.max(0,fc[wi]||0)}],losers,chipScoreList(after),"chips");
 }
 
 function SeatOrderEditor({players,onBack,onSave,color,label}){
@@ -1200,7 +1239,11 @@ function TTFGame({game,scores,round:r,setRound,onSubmit,onHistory,onShare,onDash
   const dealerIdx=r.shuffler!=null?game.players.indexOf(r.shuffler):-1;
   const submit=()=>{
     const res=r.targets.map((t,i)=>Number(r.actual[i])-t);
-    onSubmit({trump:r.trump,targets:[...r.targets],actual:r.actual.map(Number),result:res,shuffler:r.shuffler||null,dealerIdx,ts:new Date().toISOString()});
+    const rec={trump:r.trump,targets:[...r.targets],actual:r.actual.map(Number),result:res,shuffler:r.shuffler||null,dealerIdx,ts:new Date().toISOString()};
+    onSubmit(rec);
+    const winners=game.players.map((n,i)=>({name:n,amt:res[i]})).filter(x=>x.amt>0);
+    const losers=game.players.map((n,i)=>({name:n,amt:-res[i]})).filter(x=>x.amt>0);
+    speak(roundCallout(lang||"en",winners,losers,ttfScoreList({...game,rounds:[...game.rounds,rec]}),"points"),lang||"en",null);
   };
   const setTarget=(i,v)=>{const t=[...r.targets];t[i]=Number(v);setRound(c=>({...c,targets:t}))};
   const setActual=(i,v)=>{
@@ -1629,15 +1672,14 @@ function UNOGame({ game, onSubmit, onHistory, onShare, onRules, onEnd, onHome, s
   const [pts, setPts] = useState(p.map(() => ""));
   const COLORS = ["#e63946", "#f4a261", "#2a9d8f", "#4a7cfc", "#9b5de5", "#f15bb5", "#00bbf9", "#fee440", "#06d6a0", "#fb8500"];
 
+  const spkText = unoScoreSpeech(game, lang || "en");
+
   const submit = () => {
     const roundScores = p.map((_, i) => i === winner ? 0 : (Number(pts[i]) || 0));
-    onSubmit({ winner, winnerName: p[winner], cardPts: pts.map(Number), scores: roundScores, ts: new Date().toISOString() });
-    // Voice result
-    const losers=p.filter((_,i)=>i!==winner);
-    const spk=lang==="hi"
-      ?p[winner]+" ne UNO kiya! "+losers.map((l,i)=>{const li=p.indexOf(l);return l+": "+roundScores[li]+" points";}).join(". ")+"."
-      :p[winner]+" calls UNO and wins the round! "+losers.map((l,i)=>{const li=p.indexOf(l);return l+" gets "+roundScores[li]+" points";}).join(". ")+".";
-    speak(spk,lang||"en",null);
+    const rec = { winner, winnerName: p[winner], cardPts: pts.map(Number), scores: roundScores, ts: new Date().toISOString() };
+    onSubmit(rec);
+    const losers = p.map((n,i)=>({name:n,amt:roundScores[i],i})).filter(x=>x.i!==winner&&x.amt>0);
+    speak(roundCallout(lang||"en",[{name:p[winner],amt:null}],losers,pointScoreList({...game,rounds:[...game.rounds,rec]}),"points"),lang||"en",null);
     setPts(p.map(() => ""));
     setWinner(0);
   };
@@ -1710,6 +1752,8 @@ function UNOGame({ game, onSubmit, onHistory, onShare, onRules, onEnd, onHome, s
         <ShufflerCard players={p} value={dealer} onChange={setDealer} lang={lang}/>
         <Btn primary disabled={!canSubmit} onClick={submit} style={{ background: "#e63946" }}>Record Round {rn}</Btn>
         <div style={{display:"flex",gap:8}}>
+          <SpeakBtn text={spkText} lang={lang || "en"} size={46} />
+          <button onClick={() => setLang && setLang(lang === "en" ? "hi" : "en")} style={{ width: 46, height: 46, background: "#f2f2f2", border: "none", borderRadius: 13, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#555" }}>{lang === "en" ? "हिंदी" : "ENG"}</button>
           <button onClick={onShare} style={{...SB,flex:1}}>📤 Share</button>
           <button onClick={onDash} style={{...SB,flex:1}}>📊 Stats</button>
         </div>
@@ -2052,16 +2096,17 @@ function G28Game({ game, onSubmit, onHistory, onRules, onEnd, onHome, showToast,
     gp[bidTeam] = delta;
     // Defender score never changes
 
-    const spk = lang === "hi"
-      ? (bidderMade ? t[bidTeam].name + " ne jeeta! +" + Math.abs(delta) + " game point." : t[bidTeam].name + " haara! " + delta + " game point.")
-      : (bidderMade ? t[bidTeam].name + " wins! +" + delta + " pts." : t[bidTeam].name + " loses. " + delta + " pts.");
-    speak(spk, lang || "en", null);
 
-    onSubmit({
+    const rec = {
       bid: bidNum, bidTeam, dealer, pairTeam, pairAdj, effectiveBid,
       bidPts: Number(bidPts), special, isCot, wonAllTricks,
       bidderMade, gamePoints: gp, ts: new Date().toISOString()
-    });
+    };
+    onSubmit(rec);
+    const bidName = t[bidTeam].name, opName = t[opTeam].name;
+    const winners = bidderMade ? [{ name: bidName, amt: Math.abs(delta) }] : [{ name: opName, amt: null }];
+    const losers = bidderMade ? [{ name: opName, amt: null }] : [{ name: bidName, amt: Math.abs(delta) }];
+    speak(roundCallout(lang || "en", winners, losers, g28ScoreList({ ...game, rounds: [...game.rounds, rec] }, lang || "en"), "points"), lang || "en", null);
     resetRound();
     showToast(bidderMade ? "✅ +" + delta + " for " + t[bidTeam].name : "❌ " + delta + " for " + t[bidTeam].name);
   };
@@ -2706,11 +2751,12 @@ function TPGame({game,hand,setHand,onSubmit,onHistory,onRules,onEnd,onHome,showT
     const before = savedChips;
     const after = savedChips.map((c,i)=>c+fc[i]);
     const nextDi = (Number(h.dealerIdx)+1) % p.length;
-    onSubmit({changes:fc, pot:h.pot, winner:wi, winnerName:p[wi], actions:h.actions, dealerIdx:Number(h.dealerIdx), balances:after, prevBalances:before, ts:new Date().toISOString()});
+    const rec = {changes:fc, pot:h.pot, winner:wi, winnerName:p[wi], actions:h.actions, dealerIdx:Number(h.dealerIdx), balances:after, prevBalances:before, ts:new Date().toISOString()};
+    onSubmit(rec);
     setHand(makeTPHand(p, boot, nextDi));
     setShowWinner(false);
     showToast("🏆 "+p[wi]+" +"+fc[wi]+" chips");
-    speak(roundChipSpeech(p, fc, wi, lang), lang, null);
+    speak(chipRoundCallout(game, rec, lang||"en"), lang||"en", null);
   };
 
   const spkText = chipScoreSpeech(game,"Teen Patti",lang||"en");
@@ -2830,7 +2876,7 @@ function TPGame({game,hand,setHand,onSubmit,onHistory,onRules,onEnd,onHome,showT
                   // Sideshow speech
                   const survivor=p[survivors[0]]||"";
                   const spk=lang==="hi"
-                    ?p[i]+" ke patte hai ghaatiyaa aur "+survivor+" ki naayiya hogyi paar."
+                    ?p[i]+" ke patte hai ghatiyaa aur "+survivor+" ki nayiya hogyi paar."
                     :p[i]+" has the lower hand and folds. "+survivor+" stays in the game.";
                   speak(spk,lang,null);
                 }} style={{flex:1,padding:"12px 8px",borderRadius:13,background:PC[i%PC.length],color:"white",border:"none",fontWeight:700,fontSize:14,cursor:"pointer"}}>{p[i]} has lower hand → folds</button>
@@ -3168,10 +3214,11 @@ function PokerGame({game,hand,setHand,onSubmit,onHistory,onRules,onEnd,onHome,sh
     const before=savedChips;
     const after=savedChips.map((c,i)=>c+fc[i]);
     const nextDi=(Number(h.dealerIdx)+1)%p.length;
-    onSubmit({changes:fc,pot:h.pot,winner:wi,winnerName:p[wi],actions:h.actions,dealerIdx:Number(h.dealerIdx),balances:after,prevBalances:before,ts:new Date().toISOString()});
+    const rec={changes:fc,pot:h.pot,winner:wi,winnerName:p[wi],actions:h.actions,dealerIdx:Number(h.dealerIdx),balances:after,prevBalances:before,ts:new Date().toISOString()};
+    onSubmit(rec);
     setHand(makePokerHand(p,sb,bb,nextDi));
     showToast("🏆 "+p[wi]+" +"+fc[wi]+" chips");
-    speak(roundChipSpeech(p,fc,wi,lang),lang,null);
+    speak(chipRoundCallout(game,rec,lang||"en"),lang||"en",null);
   };
 
   const advStreet=()=>{
@@ -3507,13 +3554,10 @@ function RummyGame({ game, onSubmit, onHistory, onRules, onEnd, onHome, showToas
 
   const submit = () => {
     const roundScores = p.map((_, i) => getScore(i));
-    onSubmit({ winner, winnerName: p[winner], scores: roundScores, drops: playerData.map(d => d.action), cardPts: playerData.map(d => Number(d.cardPts) || 0), ts: new Date().toISOString() });
-    // Voice result
-    const losers=p.filter((_,i)=>i!==winner);
-    const spk=lang==="hi"
-      ?p[winner]+" ne Rummy declare kiya! "+losers.map(l=>{const li=p.indexOf(l);return l+": "+roundScores[li]+" points";}).join(". ")+"."
-      :p[winner]+" declares Rummy! "+losers.map(l=>{const li=p.indexOf(l);return l+" gets "+roundScores[li]+" points";}).join(". ")+".";
-    speak(spk,lang||"en",null);
+    const rec = { winner, winnerName: p[winner], scores: roundScores, drops: playerData.map(d => d.action), cardPts: playerData.map(d => Number(d.cardPts) || 0), ts: new Date().toISOString() };
+    onSubmit(rec);
+    const losers = p.map((n,i)=>({name:n,amt:roundScores[i],i})).filter(x=>x.i!==winner&&x.amt>0);
+    speak(roundCallout(lang||"en",[{name:p[winner],amt:null}],losers,pointScoreList({...game,rounds:[...game.rounds,rec]}),"points"),lang||"en",null);
     setPlayerData(p.map(() => ({ action: "play", cardPts: "" })));
     setWinner(0);
   };
