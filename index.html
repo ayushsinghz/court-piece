@@ -587,7 +587,7 @@ function unoScoreSpeech(game,lang){
 function roundCallout(lang, winners, losers, scoreText, unit){
   const hi = lang==="hi";
   const amt = x => x.amt==null ? (hi?"yeh round":"this round") : x.amt+" "+unit;
-  const w = winners.map(x => hi ? x.name+" ki hogyi bale bale aur jittee hai "+amt(x)+"." : x.name+" is celebrating and wins "+amt(x)+".");
+  const w = winners.map(x => hi ? x.name+" ki hogyi balle balle aur jittee hai "+amt(x)+"." : x.name+" is celebrating and wins "+amt(x)+".");
   const l = losers.map(x => hi ? x.name+" ne haare hai "+amt(x)+"." : x.name+" lost "+amt(x)+".");
   if(!w.length&&!l.length)w.push(hi?"Is round mein kisi ka score nahi badla.":"No change in score this round.");
   const tail = hi ? "Abhi ka score is praakaar hai. "+scoreText+"." : "The score right now is as follows. "+scoreText+".";
@@ -2876,7 +2876,7 @@ function TPGame({game,hand,setHand,onSubmit,onHistory,onRules,onEnd,onHome,showT
                   // Sideshow speech
                   const survivor=p[survivors[0]]||"";
                   const spk=lang==="hi"
-                    ?p[i]+" ke patte hai ghatiyaa aur "+survivor+" ki nayiya hogyi paar."
+                    ?p[i]+" ke patte hai ghatiyaa aur "+survivor+" ki naiya hogyi paar."
                     :p[i]+" has the lower hand and folds. "+survivor+" stays in the game.";
                   speak(spk,lang,null);
                 }} style={{flex:1,padding:"12px 8px",borderRadius:13,background:PC[i%PC.length],color:"white",border:"none",fontWeight:700,fontSize:14,cursor:"pointer"}}>{p[i]} has lower hand → folds</button>
